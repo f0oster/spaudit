@@ -1,0 +1,72 @@
+package pages
+
+import (
+  "fmt"
+  "spaudit/interfaces/web/presenters"
+  "spaudit/interfaces/web/templates/components/dashboard"
+)
+
+templ SiteTableRows(sites []presenters.SiteWithMetadata) {
+  for _, site := range sites {
+    <tr class="hover:bg-slate-50 cursor-default group">
+      <td class="px-6 py-4">
+        <div class="flex flex-col">
+          <div class="font-semibold text-slate-900">{ site.Title }</div>
+          <div class="text-xs text-slate-400 break-all mt-1">{ site.SiteURL }</div>
+          if site.Description != "" {
+            <div class="text-xs text-slate-500 mt-1">{ site.Description }</div>
+          }
+        </div>
+      </td>
+      <td class="px-3 py-4">
+        <div class="flex flex-col gap-1">
+          <span class="font-medium">{ fmt.Sprintf("%d", site.TotalLists) }</span>
+          if site.ListsWithUnique > 0 {
+            <span class="text-xs text-amber-600">{ fmt.Sprintf("%d unique", site.ListsWithUnique) }</span>
+          }
+        </div>
+      </td>
+      <td class="px-3 py-4">
+        if site.LastAuditDate != "" {
+          <div class="flex flex-col gap-1">
+            <span class="text-xs text-slate-600">{ site.LastAuditDate }</span>
+            if site.DaysAgo > 0 {
+              <span class="text-xs text-slate-500">{ fmt.Sprintf("%d days ago", site.DaysAgo) }</span>
+            }
+          </div>
+        } else {
+          <span class="text-xs text-slate-500">Never</span>
+        }
+      </td>
+      <td class="px-6 py-4 text-right">
+        <a href={ "/sites/" + fmt.Sprintf("%d", site.SiteID) + "/lists" } 
+           class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
+          View Lists →
+        </a>
+      </td>
+    </tr>
+  }
+  if len(sites) == 0 {
+    <tr>
+      <td colspan="4" class="px-6 py-12 text-center text-slate-500">
+        <div class="text-slate-400 text-4xl mb-4">🔍</div>
+        <h3 class="text-lg font-medium text-slate-900 mb-2">No sites found</h3>
+        <p class="text-slate-500">Try adjusting your search terms.</p>
+      </td>
+    </tr>
+  }
+}
+
+// SitesTableContent renders the full sites table content for SSE updates
+templ SitesTableContent(vm presenters.SiteSelectionVM) {
+  @dashboard.SitesTableContent(vm)
+}
+
+// SitesTableInner renders just the inner content without HTMX triggers
+templ SitesTableInner(vm presenters.SiteSelectionVM) {
+  if len(vm.Sites) == 0 {
+    @dashboard.SitesEmptyState()
+  } else {
+    @dashboard.SitesTableData(vm.Sites)
+  }
+}

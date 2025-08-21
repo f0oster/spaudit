@@ -1,0 +1,21 @@
+package site
+
+import "spaudit/interfaces/web/presenters"
+
+// SiteHeader renders site information and header section
+templ SiteHeader(site presenters.SiteWithMetadata) {
+	<div class="mb-6">
+		<div class="flex items-start justify-between">
+			<div>
+				<h1 class="text-2xl font-bold text-slate-900 mb-2">{ site.Title }</h1>
+				<p class="text-slate-600 break-all">{ site.SiteURL }</p>
+				if site.Description != "" {
+					<p class="text-slate-500 mt-1">{ site.Description }</p>
+				}
+			</div>
+			<div class="flex items-center gap-3">
+				<!-- Additional site actions could go here -->
+			</div>
+		</div>
+	</div>
+}

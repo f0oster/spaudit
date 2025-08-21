@@ -1,0 +1,151 @@
+package ui
+
+import "fmt"
+
+// ToastContainer renders the toast notification container
+templ ToastContainer() {
+	<div id="toast-container" 
+		 class="fixed bottom-4 right-4 z-50 space-y-2"
+		 sse-swap="toast"
+		 hx-swap="afterbegin">
+		<!-- Toasts will be dynamically added here via SSE -->
+	</div>
+}
+
+// ToastNotification renders a single toast notification  
+templ ToastNotification(message, toastType string) {
+	<div class={ "toast", "px-4", "py-3", "rounded-lg", "shadow-lg", "max-w-sm", "animate-slide-in",
+		templ.KV("bg-green-500 text-white", toastType == "completed"),
+		templ.KV("bg-red-500 text-white", toastType == "failed"), 
+		templ.KV("bg-orange-500 text-white", toastType == "cancelled"),
+		templ.KV("bg-blue-500 text-white", toastType == "info") }
+		 style="animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 4.7s;">
+		
+		<div class="flex items-center justify-between">
+			<span class="text-sm font-medium">{ message }</span>
+			<button onclick="this.parentElement.parentElement.style.animation = 'fadeOut 0.3s ease-in'; setTimeout(() => this.parentElement.parentElement.remove(), 300);"
+					class="ml-4 text-white hover:text-gray-200 focus:outline-none">
+				<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+					<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+				</svg>
+			</button>
+		</div>
+	</div>
+	
+	<script>
+		// Auto-remove toast after 5 seconds
+		setTimeout(function() {
+			var toasts = document.querySelectorAll('.toast');
+			var lastToast = toasts[toasts.length - 1];
+			if (lastToast) {
+				lastToast.style.animation = 'fadeOut 0.3s ease-in';
+				setTimeout(() => lastToast.remove(), 300);
+			}
+		}, 5000);
+	</script>
+	
+	<style>
+		@keyframes slideIn {
+			from { opacity: 0; transform: translateX(100%); }
+			to { opacity: 1; transform: translateX(0); }
+		}
+		@keyframes fadeOut {
+			from { opacity: 1; transform: translateX(0); }
+			to { opacity: 0; transform: translateX(100%); }
+		}
+	</style>
+}
+
+// RichToastNotification renders a rich toast notification with job details and stats
+templ RichToastNotification(toast ToastNotificationView) {
+	<div class={ "toast", "p-4", "rounded-lg", "shadow-xl", "min-w-80", "max-w-96", "border-l-4",
+		templ.KV("bg-white border-l-green-500", toast.Type == "completed"),
+		templ.KV("bg-white border-l-red-500", toast.Type == "failed"), 
+		templ.KV("bg-white border-l-orange-500", toast.Type == "cancelled"),
+		templ.KV("bg-white border-l-blue-500", toast.Type == "info") }
+		 style="animation: slideInUp 0.4s ease-out;">
+		
+		<div class="flex items-start justify-between mb-2">
+			<div class="flex-1">
+				<div class="font-semibold text-slate-900 text-sm">{ toast.Title }</div>
+				if toast.Message != "" {
+					<div class="text-slate-600 text-xs mt-1">{ toast.Message }</div>
+				}
+			</div>
+			<button onclick="this.parentElement.parentElement.style.animation = 'slideOutUp 0.3s ease-in'; setTimeout(() => this.parentElement.parentElement.remove(), 300);"
+					class="ml-3 text-slate-400 hover:text-slate-600 focus:outline-none flex-shrink-0">
+				<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+					<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+				</svg>
+			</button>
+		</div>
+		
+		<!-- Site URL if available -->
+		if toast.SiteURL != "" {
+			<div class="text-xs text-slate-500 mb-2 truncate" title={ toast.SiteURL }>
+				🌐 { toast.SiteURL }
+			</div>
+		}
+		
+		<!-- Duration if available -->
+		if toast.Duration != "" {
+			<div class="text-xs text-slate-500 mb-2">
+				⏱️ Completed in { toast.Duration }
+			</div>
+		}
+		
+		<!-- Stats breakdown if available -->
+		if toast.Stats != nil {
+			<div class="border-t pt-2 mt-2 grid grid-cols-2 gap-2 text-xs">
+				if toast.Stats.ListsProcessed > 0 {
+					<div class="text-slate-600">
+						<span class="font-medium">{ fmt.Sprintf("%d", toast.Stats.ListsProcessed) }</span> lists
+					</div>
+				}
+				if toast.Stats.ItemsProcessed > 0 {
+					<div class="text-slate-600">
+						<span class="font-medium">{ fmt.Sprintf("%d", toast.Stats.ItemsProcessed) }</span> items
+					</div>
+				}
+				if toast.Stats.PermissionsFound > 0 {
+					<div class="text-slate-600">
+						<span class="font-medium">{ fmt.Sprintf("%d", toast.Stats.PermissionsFound) }</span> permissions
+					</div>
+				}
+				if toast.Stats.SharingLinks > 0 {
+					<div class="text-slate-600">
+						<span class="font-medium">{ fmt.Sprintf("%d", toast.Stats.SharingLinks) }</span> links
+					</div>
+				}
+				if toast.Stats.ErrorsCount > 0 {
+					<div class="text-red-600">
+						<span class="font-medium">{ fmt.Sprintf("%d", toast.Stats.ErrorsCount) }</span> errors
+					</div>
+				}
+			</div>
+		}
+	</div>
+	
+	<script>
+		// Auto-remove toast after 8 seconds (longer for rich toast)
+		setTimeout(function() {
+			var toasts = document.querySelectorAll('.toast');
+			var lastToast = toasts[toasts.length - 1];
+			if (lastToast) {
+				lastToast.style.animation = 'slideOutUp 0.3s ease-in';
+				setTimeout(() => lastToast.remove(), 300);
+			}
+		}, 8000);
+	</script>
+	
+	<style>
+		@keyframes slideInUp {
+			from { opacity: 0; transform: translateY(100%) translateX(0); }
+			to { opacity: 1; transform: translateY(0) translateX(0); }
+		}
+		@keyframes slideOutUp {
+			from { opacity: 1; transform: translateY(0) translateX(0); }
+			to { opacity: 0; transform: translateY(-100%) translateX(0); }
+		}
+	</style>
+}

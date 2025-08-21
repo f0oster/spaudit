@@ -1,0 +1,116 @@
+package analytics
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+)
+
+// RiskMeter renders a risk assessment visualization with breakdown
+templ RiskMeter(riskLevel string, riskScore float64, analytics presenters.ListAnalytics) {
+	<div class="space-y-4">
+		<div class="flex items-center justify-between">
+			<span class="text-sm font-semibold text-slate-800">Permission Risk Level</span>
+			switch riskLevel {
+			case "Low":
+				<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 border border-emerald-200 shadow-sm">
+					<div class="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse"></div>
+					Low Risk
+				</span>
+			case "Medium":
+				<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200 shadow-sm">
+					<div class="w-2 h-2 bg-amber-500 rounded-full mr-2 animate-pulse"></div>
+					Medium Risk
+				</span>
+			case "High":
+				<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-red-100 to-rose-100 text-red-800 border border-red-200 shadow-sm">
+					<div class="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+					High Risk
+				</span>
+			default:
+				<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-slate-100 to-gray-100 text-slate-800 border border-slate-200 shadow-sm">
+					<div class="w-2 h-2 bg-slate-500 rounded-full mr-2"></div>
+					Unknown
+				</span>
+			}
+		</div>
+		
+		<!-- Risk Score Bar -->
+		@RiskScoreBar(riskLevel, riskScore)
+		
+		<!-- Risk Breakdown -->
+		@RiskBreakdown(analytics, riskScore)
+	</div>
+}
+
+// RiskScoreBar renders the progress bar for risk score
+templ RiskScoreBar(riskLevel string, riskScore float64) {
+	<div class="space-y-3">
+		<div class="flex justify-between text-xs font-medium text-slate-600">
+			<span class="bg-slate-100 px-2 py-1 rounded">0%</span>
+			<span class="bg-slate-800 text-white px-2 py-1 rounded font-bold">{ fmt.Sprintf("%.1f%%", riskScore) }</span>
+			<span class="bg-slate-100 px-2 py-1 rounded">100%</span>
+		</div>
+		<div class="relative">
+			<div class="w-full bg-gradient-to-r from-slate-200 to-slate-300 rounded-full h-4 shadow-inner">
+				<div 
+					class="h-4 rounded-full transition-all duration-700 ease-out shadow-lg relative overflow-hidden"
+					style={ fmt.Sprintf("width: %.1f%%;", riskScore) + " " + getRiskBarColor(riskLevel) }
+				>
+					<div class="absolute inset-0 bg-white opacity-30 animate-pulse"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// RiskBreakdown renders detailed risk factor breakdown
+templ RiskBreakdown(analytics presenters.ListAnalytics, riskScore float64) {
+	<div class="bg-slate-50 rounded-lg p-4 mt-4">
+		<h4 class="text-sm font-semibold text-slate-800 mb-3">Risk Breakdown</h4>
+		<div class="space-y-2 text-xs">
+			if analytics.RiskFromUniqueItems > 0 {
+				<div class="flex justify-between">
+					<span class="text-slate-600">Items with unique permissions:</span>
+					<span class="font-medium text-slate-900">{ fmt.Sprintf("%.1f pts", analytics.RiskFromUniqueItems) }</span>
+				</div>
+			}
+			if analytics.RiskFromAssignments > 0 {
+				<div class="flex justify-between">
+					<span class="text-slate-600">Permission assignments:</span>
+					<span class="font-medium text-slate-900">{ fmt.Sprintf("%.1f pts", analytics.RiskFromAssignments) }</span>
+				</div>
+			}
+			if analytics.RiskFromSharingLinks > 0 {
+				<div class="flex justify-between">
+					<span class="text-slate-600">Sharing links:</span>
+					<span class="font-medium text-slate-900">{ fmt.Sprintf("%.1f pts", analytics.RiskFromSharingLinks) }</span>
+				</div>
+			}
+			if analytics.RiskFromElevatedAccess > 0 {
+				<div class="flex justify-between">
+					<span class="text-slate-600">Full Control/Contribute:</span>
+					<span class="font-medium text-slate-900">{ fmt.Sprintf("%.1f pts", analytics.RiskFromElevatedAccess) }</span>
+				</div>
+			}
+			<div class="border-t border-slate-200 pt-2 mt-2">
+				<div class="flex justify-between font-semibold">
+					<span class="text-slate-800">Total Risk Score:</span>
+					<span class="text-slate-900">{ fmt.Sprintf("%.1f pts (%.1f%%)", riskScore, riskScore) }</span>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+func getRiskBarColor(riskLevel string) string {
+	switch riskLevel {
+	case "Low":
+		return "background: linear-gradient(90deg, #10b981, #059669);" // emerald gradient
+	case "Medium":
+		return "background: linear-gradient(90deg, #f59e0b, #d97706);" // amber gradient
+	case "High":
+		return "background: linear-gradient(90deg, #ef4444, #dc2626);" // red gradient
+	default:
+		return "background: linear-gradient(90deg, #6b7280, #4b5563);" // slate gradient
+	}
+}

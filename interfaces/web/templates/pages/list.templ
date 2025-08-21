@@ -1,0 +1,87 @@
+package pages
+
+import (
+  "spaudit/interfaces/web/presenters"
+  "spaudit/interfaces/web/templates/components/core"
+)
+
+templ ListItemsPage(list presenters.ListSummary, items []presenters.ItemSummary) {
+  @core.Layout(list.Title + " · Items") {
+    <div class="mb-4 flex items-center justify-between gap-2">
+      <div>
+        <h2 class="text-xl font-semibold">{ list.Title } — Items</h2>
+        <div class="text-sm text-slate-600 break-all">{ list.URL }</div>
+      </div>
+      <a href="/" class="text-blue-600 hover:underline">Back</a>
+    </div>
+
+    <div class="mb-4 flex items-center gap-3">
+      <button
+        class="text-blue-600 hover:underline"
+        hx-get={ "/api/object/list/" + list.ListID + "/assignments" }
+        hx-target="#list-assignments"
+        hx-swap="innerHTML"
+        hx-indicator="#list-ind">
+        View list assignments
+      </button>
+      if list.HasUnique {
+        <span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full bg-amber-50 text-amber-800 border border-amber-300">List has unique permissions</span>
+      }
+      <div id="list-ind" class="htmx-indicator text-xs text-slate-500">Loading…</div>
+    </div>
+
+    <div id="list-assignments" class="mb-6 text-sm text-slate-700"></div>
+
+    <div class="bg-white border rounded-xl shadow-sm">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <div class="font-medium">Items</div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-100 text-slate-600">
+            <tr>
+              <th class="text-left px-3 py-2">ID</th>
+              <th class="text-left px-3 py-2">Name</th>
+              <th class="text-left px-3 py-2">Kind</th>
+              <th class="text-left px-3 py-2">URL</th>
+              <th class="text-right px-3 py-2">Assignments</th>
+            </tr>
+          </thead>
+          <tbody>
+            for _, it := range items {
+              <tr class="border-t">
+                <td class="px-3 py-2">{ it.ItemID }</td>
+                <td class="px-3 py-2">{ it.Name }</td>
+                <td class="px-3 py-2">
+                  if it.IsFile {
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border">File</span>
+                  } else if it.IsFolder {
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border">Folder</span>
+                  } else {
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border">Item</span>
+                  }
+                </td>
+                <td class="px-3 py-2 break-all">
+                  <a href={ it.URL } class="text-blue-600 hover:underline" target="_blank" rel="noopener">{ it.URL }</a>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <button class="text-blue-600 hover:underline"
+                          hx-get={ "/api/object/item/" + it.ItemGUID + "/assignments" }
+                          hx-target={ "#assign-" + it.ItemGUID }
+                          hx-swap="innerHTML">
+                    View
+                  </button>
+                </td>
+              </tr>
+              <tr class="bg-slate-50">
+                <td colspan="5" class="px-3 py-2">
+                  <div id={ "assign-" + it.ItemGUID } class="text-sm text-slate-700"></div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+}

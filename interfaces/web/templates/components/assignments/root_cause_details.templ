@@ -1,0 +1,103 @@
+package assignments
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+)
+
+// AssignmentRootCauseDetails renders detailed root cause analysis for a permission assignment
+templ AssignmentRootCauseDetails(assignment presenters.ExpandableAssignment) {
+	<div class="space-y-4">
+		<h4 class="font-semibold text-slate-900 text-sm border-b border-slate-200 pb-2">
+			Root Cause Analysis
+			if len(assignment.RootCauses) > 1 {
+				<span class="text-xs text-amber-600 font-normal ml-2">({ fmt.Sprintf("%d sources detected", len(assignment.RootCauses)) })</span>
+			}
+		</h4>
+		
+		for i, rootCause := range assignment.RootCauses {
+			<div class="flex items-start gap-4">
+				if rootCause.Type == "SHARING_LINK" {
+					<div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-amber-100 to-orange-200 rounded-full flex items-center justify-center border-2 border-amber-300">
+						<span class="text-amber-700 text-lg">🔗</span>
+					</div>
+					<div class="flex-1">
+						if len(assignment.RootCauses) > 1 {
+							<div class="flex items-center gap-2 mb-1">
+								<span class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Source { fmt.Sprintf("%d", i+1) }</span>
+								<div class="font-semibold text-amber-800">Sharing Link Permission</div>
+							</div>
+						} else {
+							<div class="font-semibold text-amber-800 mb-1">Sharing Link Permission</div>
+						}
+						<div class="text-slate-700 text-sm mb-2">{ rootCause.Detail }</div>
+						<div class="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+							This permission is granted through a SharePoint sharing link. The user has access via the shared URL.
+						</div>
+					</div>
+				} else if rootCause.Type == "SAME_WEB_INHERITANCE" {
+					<div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-green-100 to-emerald-200 rounded-full flex items-center justify-center border-2 border-green-300">
+						<span class="text-green-700 text-lg">🏠</span>
+					</div>
+					<div class="flex-1">
+						if len(assignment.RootCauses) > 1 {
+							<div class="flex items-center gap-2 mb-1">
+								<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">Source { fmt.Sprintf("%d", i+1) }</span>
+								<div class="font-semibold text-green-800">Web-Level Permission</div>
+							</div>
+						} else {
+							<div class="font-semibold text-green-800 mb-1">Web-Level Permission</div>
+						}
+						<div class="text-slate-700 text-sm mb-2">
+							Has <span class="font-semibold text-green-700">{ rootCause.SourceRole }</span> permission on <span class="font-semibold text-green-700">{ rootCause.SourceObject }</span>
+						</div>
+						<div class="text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+							→ SharePoint automatically grants Limited Access for navigation to this list
+						</div>
+					</div>
+				} else if rootCause.Type == "SYSTEM_GROUP" {
+					<div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center border-2 border-blue-300">
+						<span class="text-blue-700 text-lg">⚙️</span>
+					</div>
+					<div class="flex-1">
+						if len(assignment.RootCauses) > 1 {
+							<div class="flex items-center gap-2 mb-1">
+								<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">Source { fmt.Sprintf("%d", i+1) }</span>
+								<div class="font-semibold text-blue-800">System Group Membership</div>
+							</div>
+						} else {
+							<div class="font-semibold text-blue-800 mb-1">System Group Membership</div>
+						}
+						<div class="text-slate-700 text-sm mb-2">{ rootCause.Detail }</div>
+						<div class="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+							This permission is inherited from SharePoint system group membership.
+						</div>
+					</div>
+				} else {
+					<div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-slate-100 to-gray-200 rounded-full flex items-center justify-center border-2 border-slate-300">
+						<span class="text-slate-700 text-lg">❓</span>
+					</div>
+					<div class="flex-1">
+						if len(assignment.RootCauses) > 1 {
+							<div class="flex items-center gap-2 mb-1">
+								<span class="text-xs bg-slate-100 text-slate-800 px-2 py-1 rounded-full font-medium">Source { fmt.Sprintf("%d", i+1) }</span>
+								<div class="font-semibold text-slate-800">Unknown Source</div>
+							</div>
+						} else {
+							<div class="font-semibold text-slate-800 mb-1">Unknown Source</div>
+						}
+						<div class="text-slate-700 text-sm mb-2">Root cause could not be determined</div>
+						<div class="text-xs text-slate-600 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+							The origin of this permission assignment requires manual investigation.
+						</div>
+					</div>
+				}
+			</div>
+			if i < len(assignment.RootCauses) - 1 {
+				<div class="border-l-2 border-slate-200 ml-6 pl-4">
+					<div class="text-xs text-slate-500 italic">Additional permission source ↓</div>
+				</div>
+			}
+		}
+	</div>
+}

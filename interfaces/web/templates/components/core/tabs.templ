@@ -1,0 +1,72 @@
+package core
+
+import "fmt"
+
+templ Tabs(siteID int64, listID string, active string) {
+  <div class="border-b border-slate-200 flex gap-1 text-sm" role="tablist" aria-label="List content tabs">
+    <button
+      class={ "px-3 py-2 rounded-t hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset " + isActive(active, "overview") }
+      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/tabs/" + listID + "/overview" }
+      hx-target="#tab-body"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-indicator="#tab-loading"
+      hx-on::before-request="this.classList.add('loading')"
+      hx-on::after-request="this.classList.remove('loading')"
+      role="tab"
+      aria-selected={ isSelected(active, "overview") }
+      aria-controls="tab-body">
+      Overview
+    </button>
+
+    <button
+      class={ "px-3 py-2 rounded-t hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset " + isActive(active, "assignments") }
+      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/tabs/" + listID + "/assignments" }
+      hx-target="#tab-body"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-indicator="#tab-loading"
+      hx-on::before-request="this.classList.add('loading')"
+      hx-on::after-request="this.classList.remove('loading')"
+      role="tab"
+      aria-selected={ isSelected(active, "assignments") }
+      aria-controls="tab-body">
+      List Permissions
+    </button>
+
+    <button
+      class={ "px-3 py-2 rounded-t hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset " + isActive(active, "items") }
+      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/tabs/" + listID + "/items" }
+      hx-target="#tab-body"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-indicator="#tab-loading"
+      hx-on::before-request="this.classList.add('loading')"
+      hx-on::after-request="this.classList.remove('loading')"
+      role="tab"
+      aria-selected={ isSelected(active, "items") }
+      aria-controls="tab-body">
+      Custom Items
+    </button>
+
+    <button
+      class={ "px-3 py-2 rounded-t hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset " + isActive(active, "links") }
+      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/tabs/" + listID + "/links" }
+      hx-target="#tab-body"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-indicator="#tab-loading"
+      hx-on::before-request="this.classList.add('loading')"
+      hx-on::after-request="this.classList.remove('loading')"
+      role="tab"
+      aria-selected={ isSelected(active, "links") }
+      aria-controls="tab-body">
+      Sharing Links
+    </button>
+
+    <div id="tab-loading" class="htmx-indicator inline-flex items-center gap-2 text-sm text-slate-500" role="status" aria-label="Loading tab content">
+      <div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" aria-hidden="true"></div>
+      <span>Loading...</span>
+    </div>
+  </div>
+}

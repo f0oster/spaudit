@@ -1,0 +1,153 @@
+package ui
+
+templ Table() {
+	<div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+		<table class="w-full table-fixed">
+			{ children... }
+		</table>
+	</div>
+}
+
+templ ItemsTable() {
+	<div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+		<table class="items-table">
+			<colgroup>
+				<col class="col-name">
+				<col class="col-type">
+				<col class="col-permissions">
+			</colgroup>
+			{ children... }
+		</table>
+	</div>
+}
+
+templ SharingLinksTable() {
+	<div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+		<table class="sharing-links-table">
+			<colgroup>
+				<col class="col-url">
+				<col class="col-type">
+				<col class="col-scope">
+				<col class="col-permissions">
+				<col class="col-expiry">
+				<col class="col-created">
+			</colgroup>
+			{ children... }
+		</table>
+	</div>
+}
+
+templ TableHeader() {
+	<thead class="bg-slate-50 border-b border-slate-200">
+		<tr>
+			{ children... }
+		</tr>
+	</thead>
+}
+
+templ TableHeaderCell(label string, width string) {
+	<th class={ "text-left px-3 py-2 font-medium text-slate-700 text-sm " + width }>
+		{ label }
+	</th>
+}
+
+templ TableBody() {
+	<tbody class="divide-y divide-slate-100 bg-white">
+		{ children... }
+	</tbody>
+}
+
+templ TableRow(expandable bool, expandID string) {
+	<tr class="hover:bg-slate-50 transition-colors duration-150">
+		{ children... }
+	</tr>
+}
+
+templ TableCell() {
+	<td class="px-3 py-2 text-sm align-top">
+		{ children... }
+	</td>
+}
+
+templ TableCellWithWidth(width string) {
+	<td class={ "px-3 py-2 text-sm align-top " + width }>
+		{ children... }
+	</td>
+}
+
+templ TableExpandableRow(rowID string, isHidden bool, colspan string) {
+	if isHidden {
+		<tr id={ rowID } data-state="hidden" style="display: none;" class="bg-gradient-to-r from-slate-50 to-blue-50/20 border-l-4 border-blue-200">
+			<td colspan={ colspan } class="px-6 py-4 border-t border-slate-200">
+				<input type="hidden" name="state" value="hidden">
+				<div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+					{ children... }
+				</div>
+			</td>
+		</tr>
+	} else {
+		<tr id={ rowID } data-state="expanded" class="bg-gradient-to-r from-slate-50 to-blue-50/20 border-l-4 border-blue-200">
+			<td colspan={ colspan } class="px-6 py-4 border-t border-slate-200">
+				<input type="hidden" name="state" value="expanded">
+				<div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm animate-fadeIn">
+					{ children... }
+				</div>
+			</td>
+		</tr>
+	}
+}
+
+
+
+templ ActionButton(text string, endpoint string, targetID string, variant string) {
+	<button 
+		id={ "btn-" + targetID }
+		class="text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded"
+		hx-post={ endpoint }
+		hx-target={ "#" + targetID }
+		hx-swap="outerHTML"
+		hx-include={ "#" + targetID }
+		aria-label={ text + " for item " + targetID }
+	>
+		{ text }
+	</button>
+}
+
+templ LinkButton(text string, url string, external bool) {
+	if external {
+		<a 
+			href={ url }
+			target="_blank"
+			rel="noopener noreferrer"
+			class="text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded"
+			aria-label={ text + " (opens in new tab)" }
+		>
+			{ text }
+			<span class="sr-only"> (opens in new tab)</span>
+		</a>
+	} else {
+		<a 
+			href={ url }
+			class="text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded"
+		>
+			{ text }
+		</a>
+	}
+}
+
+templ UserInfo(title string, loginName string, principalType int32) {
+	<div class="flex items-center gap-3 min-w-0">
+		<div class="min-w-0 flex-1">
+			<div class="font-semibold text-slate-900 text-sm truncate" title={ title }>{ title }</div>
+			<div class="text-xs text-slate-500 font-mono truncate" title={ loginName }>{ loginName }</div>
+		</div>
+	</div>
+}
+
+templ EmptyState(title string, description string, icon string) {
+	<div class="text-center py-12 px-6">
+		<div class="text-6xl mb-4 opacity-50">{ icon }</div>
+		<h3 class="text-lg font-semibold text-slate-900 mb-2">{ title }</h3>
+		<p class="text-slate-500 max-w-md mx-auto">{ description }</p>
+	</div>
+}

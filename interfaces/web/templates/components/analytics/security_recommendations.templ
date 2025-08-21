@@ -1,0 +1,60 @@
+package analytics
+
+import (
+	"spaudit/interfaces/web/presenters"
+)
+
+// SecurityRecommendations renders security recommendations based on analytics data
+templ SecurityRecommendations(analytics presenters.ListAnalytics) {
+	@AnalyticsCard("Security Recommendations") {
+		<div class="space-y-3">
+			if analytics.PermissionRiskLevel == "High" || analytics.UniqueAssignments > 10 {
+				<div class="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+					<span class="text-red-600 text-lg">🚨</span>
+					<div class="text-sm">
+						<div class="font-medium text-red-800">Review Unique Permissions</div>
+						<div class="text-red-600 mt-1">Consider consolidating permissions to reduce complexity and security risks.</div>
+					</div>
+				</div>
+			}
+			
+			if analytics.SharingLinkCount > 5 {
+				<div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+					<span class="text-amber-600 text-lg">⚠️</span>
+					<div class="text-sm">
+						<div class="font-medium text-amber-800">Monitor Sharing Links</div>
+						<div class="text-amber-600 mt-1">High number of sharing links detected. Review active links and their permissions.</div>
+					</div>
+				</div>
+			}
+			
+			if analytics.FullControlCount > 3 {
+				<div class="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+					<span class="text-orange-600 text-lg">🔐</span>
+					<div class="text-sm">
+						<div class="font-medium text-orange-800">Limit Full Control Access</div>
+						<div class="text-orange-600 mt-1">Consider if all users with Full Control actually need this level of access.</div>
+					</div>
+				</div>
+			}
+			
+			if analytics.PermissionRiskLevel == "Low" && analytics.SharingLinkCount == 0 {
+				<div class="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+					<span class="text-green-600 text-lg">✅</span>
+					<div class="text-sm">
+						<div class="font-medium text-green-800">Good Security Posture</div>
+						<div class="text-green-600 mt-1">This list follows security best practices with minimal permission complexity.</div>
+					</div>
+				</div>
+			} else if analytics.PermissionRiskLevel == "Low" {
+				<div class="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+					<span class="text-blue-600 text-lg">ℹ️</span>
+					<div class="text-sm">
+						<div class="font-medium text-blue-800">Generally Secure</div>
+						<div class="text-blue-600 mt-1">This list has a low security risk profile with some sharing activity.</div>
+					</div>
+				</div>
+			}
+		</div>
+	}
+}

@@ -1,0 +1,15 @@
+package pages
+
+import (
+	"spaudit/interfaces/web/presenters"
+	"spaudit/interfaces/web/templates/components/core"
+	"spaudit/interfaces/web/templates/components/dashboard"
+)
+
+templ SiteSelectionPage(vm presenters.SiteSelectionVM) {
+	@core.Layout("SP Audit · Dashboard") {
+		@dashboard.AuditForm()
+		@dashboard.BackgroundJobsSection(vm)
+		@dashboard.SitesTable(vm)
+	}
+}

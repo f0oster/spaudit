@@ -1,0 +1,198 @@
+package jobs
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+)
+
+templ JobsList(jobs *presenters.JobListView) {
+	<div class="bg-white border rounded-xl shadow-sm"
+	     role="region"
+	     aria-label="Background Jobs">
+		<div class="px-6 py-4 border-b">
+			<h2 class="font-semibold text-lg text-slate-900" id="jobs-heading">Background Jobs</h2>
+			<p class="text-sm text-slate-500">Track the progress of your audit jobs</p>
+		</div>
+		<div id="jobs-list" 
+		     hx-get="/jobs" 
+		     hx-trigger="load, sse:jobs-updated, every 5s"
+		     hx-swap="innerHTML"
+		     hx-indicator="#jobs-loading"
+		     class="divide-y divide-slate-200"
+		     aria-labelledby="jobs-heading"
+		     aria-live="polite">
+			<div id="jobs-loading" class="htmx-indicator flex items-center justify-center py-8">
+				<div class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mr-3"></div>
+				<span class="text-sm text-slate-600">Loading jobs...</span>
+			</div>
+		</div>
+	</div>
+}
+
+// Extracted sub-components for better maintainability and reusability
+templ JobContextBadges(job *presenters.JobStatusView) {
+	if job.SiteTitle != "" && job.SiteTitle != job.SiteURL {
+		<div class="mt-2 flex flex-wrap gap-1">
+			<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800" role="status" aria-label={ "Site: " + job.SiteTitle }>
+				<span class="mr-1" role="img" aria-label="Site">🌐</span>{ job.SiteTitle }
+			</span>
+			@JobCurrentContext(job)
+		</div>
+	} else if job.CurrentList != "" || job.CurrentItem != "" {
+		<div class="mt-2 flex flex-wrap gap-1">
+			@JobCurrentContext(job)
+		</div>
+	}
+}
+
+templ JobCurrentContext(job *presenters.JobStatusView) {
+	if job.CurrentList != "" {
+		<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800" role="status" aria-label={ "Current list: " + job.CurrentList }>
+			<span class="mr-1" role="img" aria-label="List">📋</span>{ job.CurrentList }
+		</span>
+	}
+	if job.CurrentItem != "" {
+		<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800" role="status" aria-label={ "Current item: " + job.CurrentItem }>
+			<span class="mr-1" role="img" aria-label="Item">📄</span>{ job.CurrentItem }
+		</span>
+	}
+}
+
+templ JobProgressDetails(job *presenters.JobStatusView) {
+	if job.IsActive && (job.Stats.ListsFound > 0 || job.Stats.ItemsFound > 0 || job.Stats.PermissionsAnalyzed > 0) {
+		<div class="mt-1 text-xs text-slate-600" role="status" aria-label="Job progress details">
+			@JobStatsDisplay(job.Stats)
+		</div>
+	}
+}
+
+templ JobStatsDisplay(stats presenters.JobStatsDisplay) {
+	if stats.ListsFound > 0 {
+		Lists: { fmt.Sprintf("%d/%d", stats.ListsProcessed, stats.ListsFound) }
+		if stats.ItemsFound > 0 {
+			 • Items: { fmt.Sprintf("%d/%d", stats.ItemsProcessed, stats.ItemsFound) }
+		}
+		@JobAdditionalStats(stats)
+	} else if stats.ItemsFound > 0 {
+		Items: { fmt.Sprintf("%d/%d", stats.ItemsProcessed, stats.ItemsFound) }
+		@JobAdditionalStats(stats)
+	} else {
+		@JobAdditionalStats(stats)
+	}
+}
+
+templ JobAdditionalStats(stats presenters.JobStatsDisplay) {
+	if stats.PermissionsAnalyzed > 0 {
+		if stats.ListsFound > 0 || stats.ItemsFound > 0 {
+			 • Permissions: { fmt.Sprintf("%d", stats.PermissionsAnalyzed) }
+		} else {
+			Permissions: { fmt.Sprintf("%d", stats.PermissionsAnalyzed) }
+		}
+	}
+	if stats.SharingLinksFound > 0 {
+		if stats.ListsFound > 0 || stats.ItemsFound > 0 || stats.PermissionsAnalyzed > 0 {
+			 • Links: { fmt.Sprintf("%d", stats.SharingLinksFound) }
+		} else {
+			Links: { fmt.Sprintf("%d", stats.SharingLinksFound) }
+		}
+	}
+	if stats.ErrorsEncountered > 0 {
+		if stats.ListsFound > 0 || stats.ItemsFound > 0 || stats.PermissionsAnalyzed > 0 || stats.SharingLinksFound > 0 {
+			 • <span class="text-red-600" role="alert">Errors: { fmt.Sprintf("%d", stats.ErrorsEncountered) }</span>
+		} else {
+			<span class="text-red-600" role="alert">Errors: { fmt.Sprintf("%d", stats.ErrorsEncountered) }</span>
+		}
+	}
+}
+
+templ JobActions(job *presenters.JobStatusView) {
+	if job.IsActive {
+		<div class="mt-2">
+			<button class="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded border border-red-300 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
+				hx-post={ "/jobs/" + job.ID + "/cancel" }
+				hx-target={ "#cancel-status-" + job.ID }
+				hx-swap="innerHTML"
+				hx-indicator={ "#cancel-loading-" + job.ID }
+				hx-on::before-request="this.disabled = true; this.textContent = 'Cancelling...';"
+				hx-on::after-request="
+					this.disabled = false;
+					if (event.detail.xhr.status === 200) {
+						htmx.trigger('#jobs-list', 'sse:jobs-updated');
+						this.textContent = '🗑️ Cancel';
+					} else {
+						this.textContent = '🗑️ Cancel';
+					}
+				"
+				aria-label={ "Cancel job " + job.ID }>
+				<span role="img" aria-label="Cancel">🗑️</span> Cancel
+			</button>
+			<div id={ "cancel-loading-" + job.ID } class="htmx-indicator inline-flex items-center ml-2">
+				<div class="animate-spin h-3 w-3 border border-red-500 border-t-transparent rounded-full"></div>
+			</div>
+			<div id={ "cancel-status-" + job.ID } class="mt-1" role="status" aria-live="polite"></div>
+		</div>
+	}
+}
+
+templ JobStatusBadge(job *presenters.JobStatusView) {
+	<div class="text-right ml-4">
+		<div class="text-sm">
+			switch job.Status {
+			case "pending":
+				<span class="text-gray-600" role="status" aria-label="Job is pending">
+					<span role="img" aria-label="Pending">⏳</span> Pending
+				</span>
+			case "running":
+				<span class="text-blue-600" role="status" aria-label="Job is running">
+					<span role="img" aria-label="Running">🔄</span> Running
+				</span>
+			case "completed":
+				<span class="text-green-600" role="status" aria-label="Job completed successfully">
+					<span role="img" aria-label="Completed">✅</span> Completed
+				</span>
+			case "failed":
+				<span class="text-red-600" role="alert" aria-label="Job failed">
+					<span role="img" aria-label="Failed">❌</span> Failed
+				</span>
+			case "cancelled":
+				<span class="text-orange-600" role="status" aria-label="Job was cancelled">
+					<span role="img" aria-label="Cancelled">⏹️</span> Cancelled
+				</span>
+			default:
+				<span class="text-gray-600" role="status" aria-label={ "Job status: " + job.Status }>
+					<span role="img" aria-label="Unknown status">❓</span> { job.Status }
+				</span>
+			}
+			<div class="text-xs text-slate-500 mt-1" role="status">{ job.Progress }</div>
+			if job.IsActive && job.StageDuration != "" {
+				<div class="text-xs text-slate-400 mt-1" role="status">Stage: { job.StageDuration }</div>
+			}
+		</div>
+	</div>
+}
+
+templ JobItem(job *presenters.JobStatusView) {
+	<div class="px-6 py-4 border-b border-slate-100 last:border-b-0" role="article" aria-label={ "Job: " + job.Type + " for " + job.SiteURL }>
+		<div class="flex items-center justify-between">
+			<div class="flex-1">
+				<div class="font-medium text-slate-900">
+					switch job.Type {
+					case "site_audit":
+						Site Audit
+					case "item_audit":
+						Item Audit
+					default:
+						{ job.Type }
+					}
+				</div>
+				<div class="text-sm text-slate-500 break-all" title={ job.SiteURL }>{ job.SiteURL }</div>
+				<div class="text-xs text-slate-400 font-mono">Job ID: { job.ID }</div>
+				
+				@JobContextBadges(job)
+				@JobProgressDetails(job)
+				@JobActions(job)
+			</div>
+			@JobStatusBadge(job)
+		</div>
+	</div>
+}

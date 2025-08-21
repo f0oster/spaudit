@@ -1,0 +1,22 @@
+package dashboard
+
+import "spaudit/interfaces/web/presenters"
+
+// BackgroundJobsSection renders the jobs monitoring section with SSE updates
+templ BackgroundJobsSection(vm presenters.SiteSelectionVM) {
+	<div id="jobs-section" class={ "mb-8", templ.KV("hidden", !vm.HasActiveJobs) }>
+		<div class="bg-white border rounded-xl shadow-sm">
+			<div class="px-6 py-4 border-b">
+				<h2 class="font-semibold text-lg text-slate-900">Background Jobs</h2>
+				<p class="text-sm text-slate-500">Track the progress of your audit jobs</p>
+			</div>
+			<div id="jobs-list" 
+				 hx-get="/jobs" 
+				 hx-trigger="load, sse:jobs-updated"
+				 hx-swap="innerHTML"
+				 class="divide-y divide-slate-200">
+				<!-- Jobs will be loaded here via HTMX with real-time SSE updates -->
+			</div>
+		</div>
+	</div>
+}

@@ -1,0 +1,69 @@
+package sharepoint
+
+import "spaudit/interfaces/web/templates/components/ui"
+
+templ LimitedAccessHelp() {
+	@ui.Alert("info", "Understanding \"Limited Access\" Permissions", LimitedAccessContent())
+}
+
+templ LimitedAccessContent() {
+	<div class="space-y-2">
+		<p>
+			<strong>Limited Access</strong> permissions are automatically created by SharePoint when users are granted access to specific items. 
+			These permissions enable navigation to shared content without providing broader site access.
+		</p>
+		<p>
+			<strong>Why you see these:</strong> When someone shares a specific file or folder, SharePoint automatically grants "Limited Access" 
+			to the parent lists, libraries, and site to allow the user to navigate to their permitted content.
+		</p>
+		<p>
+			<strong>Security impact:</strong> Limited Access does not grant actual content access - it only provides the minimum 
+			permissions needed for navigation and site structure visibility.
+		</p>
+		<p>
+			<strong>What this means:</strong> Limited Access implies the user has access to at least one child item, but the actual permission level must be checked at the item/folder scope. The 'Details' button will attempt to determine the items or folders responsible.
+		</p>
+	</div>
+}
+
+templ SharingLinkHelp() {
+	@ui.Alert("warning", "Sharing Link Principals", SharingLinkContent())
+}
+
+templ SharingLinkContent() {
+	<div class="space-y-2">
+		<p>
+			Principals starting with <code class="bg-amber-100 px-1 rounded text-xs">SharingLinks.</code> represent SharePoint sharing links 
+			(Organization, Anonymous, or Flexible sharing links).
+		</p>
+		<p>
+			<strong>Why they appear in assignments:</strong> SharePoint automatically grants these sharing link principals 
+			navigation permissions across the site to enable access to shared content.
+		</p>
+	</div>
+}
+
+templ SiteGroupHelp() {
+	@ui.Alert("warning", "Site Groups as Direct Permissions", SiteGroupContent())
+}
+
+templ SiteGroupContent() {
+	<div class="space-y-2">
+		<p>
+			You're seeing built-in site groups (like <strong>"Members"</strong>, <strong>"Owners"</strong>, and <strong>"Visitors"</strong>) 
+			listed as <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800">Direct</span> permissions instead of inherited ones.
+		</p>
+		<p>
+			<strong>This means inheritance was broken:</strong> Someone has customized permissions on this list by breaking inheritance 
+			from the parent site. SharePoint then re-adds the default site groups as direct assignments to maintain basic functionality.
+		</p>
+		<p>
+			<strong>Why this happens:</strong> Administrators often break inheritance to add specific users or restrict access, 
+			but want to keep the standard site groups. These groups now show as "direct" because they were explicitly re-assigned.
+		</p>
+		<p>
+			<strong>Security impact:</strong> This is normal behavior and doesn't indicate a security issue. The groups still represent 
+			the same users, but permissions are now managed at the list level instead of inherited from the site.
+		</p>
+	</div>
+}

@@ -1,0 +1,41 @@
+package sharepoint
+
+import "spaudit/interfaces/web/templates/components/ui"
+
+templ ConditionalLimitedAccessHelp(showHelp bool) {
+  if showHelp {
+    @LimitedAccessHelp()
+  }
+}
+
+templ ConditionalSharingLinkHelp(showHelp bool) {
+  if showHelp {
+    @SharingLinkHelp()
+  }
+}
+
+templ ConditionalSiteGroupHelp(showHelp bool) {
+  if showHelp {
+    @SiteGroupHelp()
+  }
+}
+
+templ SharingLinkMembersHelp() {
+	@ui.Alert("success", "Sharing Link Members", SharingLinkMembersContent())
+}
+
+templ SharingLinkMembersContent() {
+	<div class="space-y-2">
+		<p>
+			These members represent users who have <strong>accessed or been granted access</strong> to this specific sharing link.
+		</p>
+		<p>
+			<strong>Organization sharing links:</strong> Members are typically users who have either been directly 
+			provided the link by the sharer or have accessed the shared content through this link.
+		</p>
+		<p>
+			<strong>Note:</strong> This list may not include all users who have accessed the content, 
+			as SharePoint's sharing link tracking has limitations.
+		</p>
+	</div>
+}

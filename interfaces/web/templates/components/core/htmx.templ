@@ -1,0 +1,210 @@
+package core
+
+templ HTMXConfig() {
+	<script>
+		// Global HTMX configuration
+		htmx.config.defaultSwapStyle = 'innerHTML';
+		htmx.config.globalViewTransitions = true;
+		htmx.config.timeout = 10000; // 10 second timeout
+		htmx.config.historyEnabled = true;
+		htmx.config.refreshOnHistoryMiss = true;
+		
+		// Enhanced error handling with better UX
+		document.body.addEventListener('htmx:responseError', function(evt) {
+			const target = evt.detail.target;
+			const status = evt.detail.xhr.status;
+			
+			// Show contextual error message
+			let message = 'Request failed. Please try again.';
+			if (status === 404) message = 'Resource not found.';
+			else if (status === 403) message = 'Access denied.';
+			else if (status === 500) message = 'Server error occurred.';
+			
+			// Try to show error in target element first
+			if (target && target.id) {
+				const errorHtml = `<div class="htmx-error p-3 rounded-lg" role="alert" aria-live="assertive">${message}</div>`;
+				target.innerHTML = errorHtml;
+				setTimeout(() => {
+					if (target.innerHTML === errorHtml) {
+						target.innerHTML = '<div class="text-slate-500 text-sm p-3">Content temporarily unavailable.</div>';
+					}
+				}, 5000);
+			} else {
+				// Fallback to toast notification
+				showToast(message, 'error');
+			}
+		});
+		
+		// Enhanced timeout handling
+		document.body.addEventListener('htmx:timeout', function(evt) {
+			const target = evt.detail.target;
+			const message = 'Request timed out. Please try again.';
+			
+			if (target && target.id) {
+				const errorHtml = `<div class="htmx-error p-3 rounded-lg" role="alert" aria-live="assertive">
+					<div class="flex items-center gap-2">
+						<span role="img" aria-label="Warning">⏰</span>
+						<span>${message}</span>
+						<button onclick="this.parentElement.parentElement.remove()" class="ml-auto text-red-600 hover:text-red-800" aria-label="Dismiss">&times;</button>
+					</div>
+				</div>`;
+				target.innerHTML = errorHtml;
+			} else {
+				showToast(message, 'error');
+			}
+		});
+		
+		// Remove loading states on completion
+		document.body.addEventListener('htmx:afterRequest', function(evt) {
+			const loadingElements = document.querySelectorAll('.loading');
+			loadingElements.forEach(el => el.classList.remove('loading'));
+		});
+		
+		// Enhanced loading state management
+		document.body.addEventListener('htmx:beforeRequest', function(evt) {
+			const element = evt.detail.elt;
+			const target = evt.detail.target;
+			
+			if (evt.detail.boosted) {
+				document.body.style.cursor = 'wait';
+				document.body.classList.add('htmx-request');
+			}
+			
+			// Add loading class to triggering element
+			if (element) {
+				element.classList.add('htmx-loading');
+				
+				// Disable buttons during request to prevent double-submission
+				if (element.tagName === 'BUTTON') {
+					element.disabled = true;
+					element.setAttribute('data-htmx-loading', 'true');
+				}
+			}
+			
+			// Show loading state on target if it has a loading placeholder
+			if (target) {
+				const loadingElement = target.querySelector('.loading-placeholder');
+				if (loadingElement) {
+					loadingElement.style.display = 'block';
+				}
+			}
+		});
+		
+		document.body.addEventListener('htmx:afterRequest', function(evt) {
+			if (evt.detail.boosted) {
+				document.body.style.cursor = '';
+				document.body.classList.remove('htmx-request');
+			}
+			
+			// Clear any existing loading states
+			document.querySelectorAll('.htmx-loading').forEach(el => {
+				el.classList.remove('htmx-loading');
+			});
+			
+			// Re-enable any disabled buttons
+			document.querySelectorAll('button[disabled][data-htmx-loading]').forEach(button => {
+				button.disabled = false;
+				button.removeAttribute('data-htmx-loading');
+			});
+		});
+		
+		// Toast notification system for better error feedback
+		function showToast(message, type = 'info', duration = 5000) {
+			const toast = document.createElement('div');
+			toast.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 transform translate-x-full`;
+			
+			switch (type) {
+				case 'error':
+					toast.className += ' bg-red-50 border-red-200 text-red-800 border';
+					break;
+				case 'success':
+					toast.className += ' bg-green-50 border-green-200 text-green-800 border';
+					break;
+				case 'warning':
+					toast.className += ' bg-amber-50 border-amber-200 text-amber-800 border';
+					break;
+				default:
+					toast.className += ' bg-blue-50 border-blue-200 text-blue-800 border';
+			}
+			
+			toast.innerHTML = `
+				<div class="flex items-start gap-3">
+					<div class="flex-1">
+						<p class="text-sm font-medium">${message}</p>
+					</div>
+					<button onclick="this.parentElement.parentElement.remove()" class="flex-shrink-0 text-current opacity-70 hover:opacity-100" aria-label="Dismiss">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+						</svg>
+					</button>
+				</div>
+			`;
+			
+			toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+			toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+			
+			document.body.appendChild(toast);
+			
+			// Animate in
+			requestAnimationFrame(() => {
+				toast.style.transform = 'translateX(0)';
+			});
+			
+			// Auto-dismiss
+			setTimeout(() => {
+				if (document.body.contains(toast)) {
+					toast.style.transform = 'translateX(100%)';
+					setTimeout(() => toast.remove(), 300);
+				}
+			}, duration);
+		}
+		
+		// Make toast function globally available
+		window.showToast = showToast;
+	</script>
+}
+
+templ HTMXForm(endpoint string, targetID string, method string, loadingID string) {
+	<form
+		if method == "post" {
+			hx-post={ endpoint }
+		} else {
+			hx-get={ endpoint }
+		}
+		hx-target={ "#" + targetID }
+		hx-swap="innerHTML"
+		if loadingID != "" {
+			hx-indicator={ "#" + loadingID }
+		}
+		hx-on::before-request="this.classList.add('loading')"
+		hx-on::after-request="this.classList.remove('loading')"
+	>
+		{ children... }
+	</form>
+}
+
+templ HTMXButton(endpoint string, targetID string, method string, loadingID string, buttonText string, buttonClass string) {
+	<button
+		class={ buttonClass }
+		if method == "post" {
+			hx-post={ endpoint }
+		} else {
+			hx-get={ endpoint }
+		}
+		hx-target={ "#" + targetID }
+		hx-swap="innerHTML"
+		if loadingID != "" {
+			hx-indicator={ "#" + loadingID }
+		}
+		hx-on::before-request="this.classList.add('loading')"
+		hx-on::after-request="this.classList.remove('loading')"
+	>
+		{ buttonText }
+	</button>
+	if loadingID != "" {
+		<div id={ loadingID } class="htmx-indicator inline-flex items-center gap-2 text-sm text-slate-500">
+			<div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+			<span>Loading...</span>
+		</div>
+	}
+}

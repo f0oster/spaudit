@@ -1,0 +1,58 @@
+package list
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+	"spaudit/interfaces/web/templates/components/sharepoint"
+	"spaudit/interfaces/web/templates/components/ui"
+	"spaudit/interfaces/web/templates/components/assignments"
+)
+
+// ListAssignmentsTab renders the assignments tab content with expandable rows
+templ ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignmentCollection) {
+	<!-- Help Cards -->
+	<div class="space-y-4 mb-6">
+		@sharepoint.ConditionalLimitedAccessHelp(collection.HasLimitedAccess)
+		@sharepoint.ConditionalSharingLinkHelp(collection.HasSharingLinks)
+		@sharepoint.ConditionalSiteGroupHelp(collection.HasSiteGroups)
+	</div>
+	
+	@ui.Table() {
+		@ui.TableHeader() {
+			@ui.TableHeaderCell("Principal", "w-2/5")
+			@ui.TableHeaderCell("Type", "w-1/6")
+			@ui.TableHeaderCell("Role", "w-1/6")
+			@ui.TableHeaderCell("Source", "w-1/6")
+			@ui.TableHeaderCell("", "w-20")
+		}
+		@ui.TableBody() {
+			for _, a := range collection.Assignments {
+				@ui.TableRow(true, "expand-row-" + a.UniqueID) {
+					@ui.TableCell() {
+						<div class="flex items-center gap-3 min-w-0">
+							@sharepoint.PrincipalIcon(a.PrincipalType)
+							@ui.UserInfo(a.PrincipalTitle, a.LoginName, a.PrincipalType)
+						</div>
+					}
+					@ui.TableCell() {
+						@ui.PrincipalTypeTag(a.PrincipalType)
+					}
+					@ui.TableCell() {
+						@ui.RoleTag(a.RoleName)
+					}
+					@ui.TableCell() {
+						@ui.SourceIndicator(a.Inherited)
+					}
+					@ui.TableCell() {
+						if a.HasRootCauses {
+							@ui.ActionButton("Details", "/sites/" + fmt.Sprintf("%d", siteID) + "/assignments/" + a.UniqueID + "/toggle", "expand-row-" + a.UniqueID, "default")
+						}
+					}
+				}
+				@ui.TableExpandableRow("expand-row-" + a.UniqueID, true, "5") {
+					@assignments.AssignmentRootCauseDetails(a)
+				}
+			}
+		}
+	}
+}

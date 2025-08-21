@@ -1,0 +1,30 @@
+package site
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+)
+
+// SiteStatsGrid renders site statistics in a grid layout
+templ SiteStatsGrid(vm presenters.SiteListsVM) {
+	<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+		<div class="bg-white border rounded-xl shadow-sm p-6">
+			<div class="text-sm font-medium text-slate-500 mb-2">Total Lists</div>
+			<div class="text-3xl font-bold text-slate-900">{ fmt.Sprintf("%d", vm.TotalLists) }</div>
+		</div>
+		<div class="bg-white border rounded-xl shadow-sm p-6">
+			<div class="text-sm font-medium text-slate-500 mb-2">Lists with Unique Permissions</div>
+			<div class="text-3xl font-bold text-slate-900">{ fmt.Sprintf("%d", vm.ListsWithUnique) }</div>
+		</div>
+		<div class="bg-white border rounded-xl shadow-sm p-6">
+			<div class="text-sm font-medium text-slate-500 mb-2">Total Items</div>
+			<div class="text-3xl font-bold text-slate-900">{ fmt.Sprintf("%d", vm.TotalItems) }</div>
+		</div>
+		if vm.TotalLists > 0 {
+			<div class="bg-white border rounded-xl shadow-sm p-6">
+				<div class="text-sm font-medium text-slate-500 mb-2">Permission Risk</div>
+				<div class="text-3xl font-bold text-slate-900">{ fmt.Sprintf("%.1f%%", float64(vm.ListsWithUnique)/float64(vm.TotalLists)*100) }</div>
+			</div>
+		}
+	</div>
+}

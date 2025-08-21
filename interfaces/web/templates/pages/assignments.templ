@@ -1,0 +1,92 @@
+package pages
+
+import (
+  "fmt"
+  "strings"
+  "spaudit/interfaces/web/presenters"
+  "spaudit/interfaces/web/templates/components/sharepoint"
+)
+
+templ AssignmentsList(collection presenters.AssignmentCollection) {
+  if len(collection.Assignments) == 0 {
+    <div class="text-slate-500 text-xs">No explicit role assignments found for this item.</div>
+  } else {
+    @sharepoint.ConditionalLimitedAccessHelp(collection.HasLimitedAccess)
+    @sharepoint.ConditionalSharingLinkHelp(collection.HasSharingLinks)
+    
+    <div class="text-xs text-slate-600 mb-3">
+      <span class="font-medium">{ fmt.Sprintf("%d", len(collection.Assignments)) } role assignments:</span>
+    </div>
+    
+    <!-- Compact assignments table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600">
+          <tr>
+            <th class="text-left px-3 py-2 font-medium w-1/3">Principal</th>
+            <th class="text-left px-3 py-2 font-medium w-1/4">Login</th>
+            <th class="text-left px-3 py-2 font-medium w-1/6">Role</th>
+            <th class="text-left px-3 py-2 font-medium w-1/12">Type</th>
+            <th class="text-left px-3 py-2 font-medium w-1/12">Source</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          for _, a := range collection.Assignments {
+            <tr class="hover:bg-slate-50">
+              <td class="px-3 py-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  if strings.HasPrefix(a.LoginName, "SharingLinks.") {
+                    <span class="principal-icon principal-icon--unknown">🔗</span>
+                    <span class="font-medium text-amber-900 text-sm truncate">Sharing Link</span>
+                  } else {
+                    @sharepoint.PrincipalIcon(a.PrincipalType)
+                    <span class="font-medium text-slate-900 text-sm truncate">{ a.PrincipalTitle }</span>
+                  }
+                </div>
+              </td>
+              <td class="px-3 py-2">
+                <div class="text-slate-600 text-xs font-mono break-all">{ a.LoginName }</div>
+              </td>
+              <td class="px-3 py-2">
+                if a.RoleName == "Limited Access" || a.RoleName == "Web-Only Limited Access" {
+                  <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-orange-50 text-orange-800 border border-orange-200" title="Automatically granted by SharePoint">
+                    Limited ⚡
+                  </span>
+                } else {
+                  <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                    { a.RoleName }
+                  </span>
+                }
+              </td>
+              <td class="px-3 py-2">
+                <div class="text-xs text-slate-600">
+                  switch a.PrincipalType {
+                  case 1:
+                    User
+                  case 2:
+                    DL
+                  case 4:
+                    Security
+                  case 8:
+                    SP Group
+                  case 16:
+                    All Users
+                  default:
+                    Unknown
+                  }
+                </div>
+              </td>
+              <td class="px-3 py-2">
+                if a.Inherited {
+                  <span class="status-badge status-badge--inherited w-5 h-5 rounded-full text-xs justify-center" title="Inherited">⬆</span>
+                } else {
+                  <span class="status-badge status-badge--direct w-5 h-5 rounded-full text-xs justify-center" title="Direct">⚫</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}

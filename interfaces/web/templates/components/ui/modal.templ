@@ -1,0 +1,33 @@
+package ui
+
+// Modal renders a reusable modal overlay with customizable content
+templ Modal(id string, title string) {
+	<div 
+		id={ id }
+		class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" 
+		onclick="if(event.target === this) { this.classList.add('hidden'); }"
+	>
+		<div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-96 overflow-auto" onclick="event.stopPropagation()">
+			<div class="flex items-center justify-between mb-3">
+				<h3 class="font-semibold text-lg">{ title }</h3>
+				<button 
+					class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none"
+					onclick="this.closest('.fixed').classList.add('hidden')"
+				>
+					×
+				</button>
+			</div>
+			<div class="modal-content">
+				{ children... }
+			</div>
+			<div class="mt-4 flex justify-end">
+				<button 
+					class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded text-sm font-medium transition-colors" 
+					onclick="this.closest('.fixed').classList.add('hidden')"
+				>
+					Close
+				</button>
+			</div>
+		</div>
+	</div>
+}

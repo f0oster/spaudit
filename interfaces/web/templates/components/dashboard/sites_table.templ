@@ -1,0 +1,124 @@
+package dashboard
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+)
+
+// SitesTable renders the discovered sites table with search functionality
+templ SitesTable(vm presenters.SiteSelectionVM) {
+	<div class="bg-white border rounded-xl shadow-sm">
+		@SitesTableHeader(vm)
+		@SitesTableContent(vm)
+	</div>
+}
+
+// SitesTableHeader renders the table header with search functionality
+templ SitesTableHeader(vm presenters.SiteSelectionVM) {
+	<div class="px-6 py-4 border-b flex items-center justify-between">
+		<div>
+			<h2 class="font-semibold text-lg text-slate-900">Available Sites</h2>
+			<p class="text-sm text-slate-500">SharePoint sites discovered in your audits</p>
+		</div>
+		if len(vm.Sites) > 0 {
+			<div class="flex items-center gap-3">
+				<input type="search" 
+					   name="search" 
+					   placeholder="Filter sites..." 
+					   class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+					   hx-get="/sites/search"
+					   hx-target="#sites-table tbody"
+					   hx-trigger="input changed delay:300ms, search"
+					   hx-indicator="#search-loading" />
+				<div id="search-loading" class="htmx-indicator">
+					<div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// SitesTableContent renders the table body with sites data or empty state
+templ SitesTableContent(vm presenters.SiteSelectionVM) {
+	<div id="sites-table-content"
+		 hx-get="/sites" 
+		 hx-trigger="load, sse:sites-updated"
+		 hx-swap="innerHTML">
+		if len(vm.Sites) == 0 {
+			@SitesEmptyState()
+		} else {
+			@SitesTableData(vm.Sites)
+		}
+	</div>
+}
+
+// SitesEmptyState renders the empty state when no sites are available
+templ SitesEmptyState() {
+	<div class="px-6 py-12 text-center">
+		<div class="text-slate-400 text-4xl mb-4">🌐</div>
+		<h3 class="text-lg font-medium text-slate-900 mb-2">No sites audited yet</h3>
+		<p class="text-slate-500">Start by auditing a SharePoint site above to see sites and their lists.</p>
+	</div>
+}
+
+// SitesTableData renders the actual sites table with data
+templ SitesTableData(sites []presenters.SiteWithMetadata) {
+	<div class="overflow-x-auto">
+		<table class="w-full text-sm" id="sites-table">
+			<thead class="bg-slate-50 text-slate-600">
+				<tr>
+					<th class="text-left px-6 py-3 font-medium">Site Details</th>
+					<th class="text-left px-3 py-3 font-medium">Lists</th>
+					<th class="text-left px-3 py-3 font-medium">Last Audited</th>
+					<th class="text-right px-6 py-3 font-medium">Actions</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-slate-200">
+				for _, site := range sites {
+					@SiteTableRow(site)
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+// SiteTableRow renders a single site row in the table
+templ SiteTableRow(site presenters.SiteWithMetadata) {
+	<tr class="hover:bg-slate-50 cursor-default group">
+		<td class="px-6 py-4">
+			<div class="flex flex-col">
+				<div class="font-semibold text-slate-900">{ site.Title }</div>
+				<div class="text-xs text-slate-400 break-all mt-1">{ site.SiteURL }</div>
+				if site.Description != "" {
+					<div class="text-xs text-slate-500 mt-1">{ site.Description }</div>
+				}
+			</div>
+		</td>
+		<td class="px-3 py-4">
+			<div class="flex flex-col gap-1">
+				<span class="font-medium">{ fmt.Sprintf("%d", site.TotalLists) }</span>
+				if site.ListsWithUnique > 0 {
+					<span class="text-xs text-amber-600">{ fmt.Sprintf("%d unique", site.ListsWithUnique) }</span>
+				}
+			</div>
+		</td>
+		<td class="px-3 py-4">
+			if site.LastAuditDate != "" {
+				<div class="flex flex-col gap-1">
+					<span class="text-xs text-slate-600">{ site.LastAuditDate }</span>
+					if site.DaysAgo > 0 {
+						<span class="text-xs text-slate-500">{ fmt.Sprintf("%d days ago", site.DaysAgo) }</span>
+					}
+				</div>
+			} else {
+				<span class="text-xs text-slate-500">Never</span>
+			}
+		</td>
+		<td class="px-6 py-4 text-right">
+			<a href={ "/sites/" + fmt.Sprintf("%d", site.SiteID) + "/lists" } 
+			   class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
+				View Lists →
+			</a>
+		</td>
+	</tr>
+}

@@ -1,0 +1,153 @@
+package ui
+
+// Unified Badge Component - supports both emoji and text-only variants
+templ Badge(text string, variant string) {
+	switch variant {
+	case "primary":
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800 whitespace-nowrap">
+			{ text }
+		</span>
+	case "success":
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-green-100 text-green-800 whitespace-nowrap">
+			{ text }
+		</span>
+	case "warning":
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800 whitespace-nowrap">
+			{ text }
+		</span>
+	case "danger":
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-800 whitespace-nowrap">
+			{ text }
+		</span>
+	case "info":
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-800 whitespace-nowrap">
+			{ text }
+		</span>
+	case "purple":
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-800 whitespace-nowrap">
+			{ text }
+		</span>
+	default:
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-700 whitespace-nowrap">
+			{ text }
+		</span>
+	}
+}
+
+// Legacy StatusBadge with emoji icons for backward compatibility
+templ StatusBadge(label string, badgeType string) {
+	switch badgeType {
+	case "unique":
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">
+			<span class="mr-1" role="img" aria-label="Warning">⚠️</span>{ label }
+		</span>
+	case "inherited":
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 whitespace-nowrap">
+			<span class="mr-1" role="img" aria-label="Success">✅</span>{ label }
+		</span>
+	case "active":
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 whitespace-nowrap">
+			<span class="mr-1" role="img" aria-label="Active">✅</span>{ label }
+		</span>
+	case "inactive":
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 whitespace-nowrap">
+			<span class="mr-1" role="img" aria-label="Inactive">❌</span>{ label }
+		</span>
+	case "direct":
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">
+			<span class="mr-1" role="img" aria-label="Direct">🎯</span>{ label }
+		</span>
+	default:
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-slate-100 text-slate-800 whitespace-nowrap">
+			{ label }
+		</span>
+	}
+}
+
+templ PermissionsBadge(hasUnique bool) {
+	if hasUnique {
+		@StatusBadge("Unique permissions", "unique")
+	} else {
+		@StatusBadge("Inherited", "inherited")
+	}
+}
+
+templ LinkStatusBadge(isActive bool) {
+	if isActive {
+		@StatusBadge("Active", "active")
+	} else {
+		@StatusBadge("Inactive", "inactive")
+	}
+}
+
+// Specialized badge components with semantic meaning
+templ RoleTag(roleName string) {
+	switch roleName {
+	case "Full Control":
+		@Badge("Full Control", "danger")
+	case "Contribute":
+		@Badge("Contribute", "warning")
+	case "Read":
+		@Badge("Read", "primary")
+	case "Limited Access", "Web-Only Limited Access":
+		@Badge("Limited", "warning")
+	default:
+		@Badge(roleName, "info")
+	}
+}
+
+templ PrincipalTypeTag(principalType int32) {
+	switch principalType {
+	case 1:
+		@Badge("User", "primary")
+	case 2:
+		@Badge("DL", "info")
+	case 4:
+		@Badge("Security", "warning")
+	case 8:
+		@Badge("Group", "success")
+	case 16:
+		@Badge("All Users", "danger")
+	default:
+		@Badge("Unknown", "info")
+	}
+}
+
+templ ItemTypeTag(isFile bool, isFolder bool) {
+	if isFile {
+		@Badge("File", "primary")
+	} else if isFolder {
+		@Badge("Folder", "success")
+	} else {
+		@Badge("Item", "info")
+	}
+}
+
+templ SourceIndicator(inherited bool) {
+	if inherited {
+		@Badge("Inherited", "success")
+	} else {
+		@Badge("Direct", "primary")
+	}
+}
+
+templ SecurityStatusBadge(riskLevel string) {
+	switch riskLevel {
+	case "High":
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800" role="alert">
+			<span class="mr-1" role="img" aria-label="High risk alert">🚨</span>High Risk
+		</span>
+	case "Medium":
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
+			<span class="mr-1" role="img" aria-label="Medium risk warning">⚠️</span>Medium Risk
+		</span>
+	case "Low":
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+			<span class="mr-1" role="img" aria-label="Low risk confirmation">✅</span>Low Risk
+		</span>
+	default:
+		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-800">
+			<span class="mr-1" role="img" aria-label="Unknown risk status">❓</span>Unknown
+		</span>
+	}
+}

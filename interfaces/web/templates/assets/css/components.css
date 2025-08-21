@@ -1,0 +1,265 @@
+/**
+ * SharePoint Audit - Custom Component Styles
+ * Extends Tailwind CSS with custom components
+ */
+
+/* Enhanced Loading States */
+.loading, .htmx-loading {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.htmx-loading {
+  position: relative;
+}
+
+.htmx-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid transparent;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 10;
+}
+
+.loading-placeholder {
+  display: none;
+  @apply flex items-center justify-center py-4 text-slate-500;
+}
+
+/* HTMX Error Handling */
+.htmx-error {
+  @apply bg-red-50 border-red-200 text-red-800 px-3 py-2 rounded-lg text-sm;
+}
+
+.htmx-error::before {
+  content: "⚠️ ";
+}
+
+/* HTMX Loading Indicators */
+.htmx-indicator {
+  @apply hidden;
+}
+
+.htmx-request .htmx-indicator {
+  @apply inline-flex;
+}
+
+.htmx-request.htmx-indicator {
+  @apply inline-flex;
+}
+
+/* Navigation loading state */
+body.htmx-request {
+  position: relative;
+}
+
+body.htmx-request::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+  animation: loading-bar 1s ease-in-out infinite;
+  z-index: 9999;
+}
+
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Toggle Buttons */
+.toggle-btn {
+  @apply text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors;
+  @apply px-2 py-1 text-sm;
+}
+
+.toggle-btn:hover {
+  @apply bg-blue-50;
+}
+
+/* Card Components */
+.info-card {
+  @apply bg-slate-50 rounded-lg p-3 border border-slate-200;
+}
+
+.member-card, .assignment-card {
+  @apply flex items-start gap-3 p-2 rounded bg-slate-50;
+}
+
+/* Status Badges */
+.status-badge {
+  @apply inline-flex items-center px-2 py-0.5 text-xs rounded-full border;
+}
+
+.status-badge--active {
+  @apply bg-green-50 text-green-800 border-green-300;
+}
+
+.status-badge--inactive {
+  @apply bg-gray-50 text-gray-800 border-gray-300;
+}
+
+.status-badge--inherited {
+  @apply bg-amber-50 text-amber-800 border-amber-300;
+}
+
+.status-badge--unique {
+  @apply bg-amber-50 text-amber-800 border-amber-200;
+}
+
+.status-badge--direct {
+  @apply bg-green-50 text-green-800 border-green-200;
+}
+
+/* Principal Icons */
+.principal-icon {
+  @apply w-5 h-5 rounded-full text-xs flex items-center justify-center flex-shrink-0;
+}
+
+.principal-icon--user {
+  @apply bg-blue-100 text-blue-700;
+}
+
+.principal-icon--group {
+  @apply bg-green-100 text-green-700;
+}
+
+.principal-icon--unknown {
+  @apply bg-gray-100 text-gray-700;
+}
+
+/* Table Improvements */
+.data-table {
+  @apply w-full text-sm;
+}
+
+.data-table thead {
+  @apply bg-slate-50 text-slate-600;
+}
+
+.data-table th {
+  @apply text-left px-3 py-3 font-medium;
+}
+
+.data-table td {
+  @apply px-3 py-4;
+}
+
+.data-table tbody tr {
+  @apply border-t hover:bg-slate-50 cursor-default group;
+}
+
+/* Expandable Rows */
+.expandable-row {
+  @apply bg-slate-50;
+}
+
+.expandable-content {
+  @apply text-sm text-slate-700;
+}
+
+/* Search and Filters */
+.search-input {
+  @apply border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+}
+
+/* Table Column Width Utilities */
+.col-name { width: 62.5%; }
+.col-type { width: 16.67%; }
+.col-status { width: 20.83%; }
+.col-url { width: 40%; }
+.col-scope { width: 12.5%; }
+.col-expiry { width: 12.5%; }
+.col-created { width: 16.67%; }
+
+/* Items Table Column Layout */
+.items-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.items-table .col-name { width: 62.5%; }
+.items-table .col-type { width: 16.67%; }
+.items-table .col-permissions { width: 20.83%; }
+
+/* Sharing Links Table Column Layout */
+.sharing-links-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.sharing-links-table .col-url { width: 40%; }
+.sharing-links-table .col-type { width: 16.67%; }
+.sharing-links-table .col-scope { width: 12.5%; }
+.sharing-links-table .col-permissions { width: 12.5%; }
+.sharing-links-table .col-expiry { width: 12.5%; }
+.sharing-links-table .col-created { width: 16.67%; }
+
+/* Animation for smooth transitions */
+.slide-down {
+  animation: slideDown 0.2s ease-out;
+}
+
+.slide-up {
+  animation: slideUp 0.2s ease-out;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

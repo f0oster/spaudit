@@ -1,0 +1,65 @@
+package list
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+	"spaudit/interfaces/web/templates/components/ui"
+)
+
+// ListItemsTab renders the items tab content with permission status and expandable assignments
+// TODO: Add pagination UI components:
+// - Add pagination controls (Previous/Next, page numbers, items per page selector)
+// - Implement HTMX-based partial updates for smooth navigation
+// - Add loading states and skeleton placeholders during pagination
+// - Consider infinite scroll as alternative for better UX
+// - Add total count display ("Showing 1-50 of 309 items")
+// - Add client-side filtering and sorting controls
+templ ListItemsTab(list presenters.ListSummary, items []presenters.ItemSummary) {
+	if len(items) == 0 {
+		@ui.EmptyState("No Items Found", "This list doesn't contain any items, or items couldn't be retrieved.", "📋")
+	} else {
+		@ui.ItemsTable() {
+			@ui.TableHeader() {
+				@ui.TableHeaderCell("Item", "w-5/8")
+				@ui.TableHeaderCell("Permissions", "w-1/6")
+				@ui.TableHeaderCell("Assignments", "w-1/6")
+			}
+			@ui.TableBody() {
+				for _, it := range items {
+					@ui.TableRow(true, "assign-row-" + it.ItemGUID) {
+						@ui.TableCell() {
+							<div class="space-y-1">
+								<div class="font-medium text-slate-900 truncate" title={ it.Name }>{ it.Name }</div>
+								<div class="flex items-center gap-2">
+									@ui.ItemTypeTag(it.IsFile, it.IsFolder)
+									<span class="text-xs text-slate-500">ID: { fmt.Sprintf("%d", it.ItemID) }</span>
+								</div>
+								if it.URL != "" {
+									<div class="text-xs text-blue-600">
+										@ui.LinkButton("View Item", it.URL, true)
+									</div>
+								}
+							</div>
+						}
+						@ui.TableCell() {
+							if it.HasUnique {
+								@ui.Badge("Unique", "warning")
+							} else {
+								@ui.Badge("Inherited", "success")
+							}
+						}
+						@ui.TableCell() {
+							@ui.ActionButton("Assignments", "/sites/" + fmt.Sprintf("%d", list.SiteID) + "/items/" + it.ItemGUID + "/assignments/toggle", "assign-row-" + it.ItemGUID, "primary")
+						}
+					}
+					@ui.TableExpandableRow("assign-row-" + it.ItemGUID, true, "3") {
+						<div class="text-center py-4 text-slate-500">
+							<div class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+							<div class="text-sm">Loading item assignments...</div>
+						</div>
+					}
+				}
+			}
+		}
+	}
+}

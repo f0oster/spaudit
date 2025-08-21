@@ -1,0 +1,410 @@
+package main
+
+import (
+	"encoding/json"
+	"io/fs"
+	"net/http"
+	"os"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httplog/v2"
+	"github.com/joho/godotenv"
+
+	"spaudit/application"
+	"spaudit/database"
+	"spaudit/domain/contracts"
+	jobsdom "spaudit/domain/jobs"
+	"spaudit/gen/db"
+	"spaudit/infrastructure/config"
+	"spaudit/infrastructure/repositories"
+	"spaudit/interfaces/web/handlers"
+	"spaudit/interfaces/web/presenters"
+	templates "spaudit/interfaces/web/templates"
+	"spaudit/logging"
+	"spaudit/platform/events"
+	"spaudit/platform/executors"
+	"spaudit/platform/factories"
+)
+
+func main() {
+	// Initialize configuration
+	loadEnvironment()
+	cfg := config.LoadAppConfigFromEnv()
+
+	// Initialize logging
+	logger := initializeLogging(cfg)
+
+	// Initialize database
+	db := initializeDatabase(cfg, logger)
+	defer db.Close()
+
+	// Build dependencies
+	deps := buildDependencies(db, logger)
+
+	// Setup routes and start server
+	router := setupRoutes(deps, cfg)
+	startServer(router, cfg.HTTPAddr, logger)
+}
+
+// ApplicationServices groups all business logic services
+type ApplicationServices struct {
+	JobService          application.JobService
+	AuditService        application.AuditService
+	SiteContentService  *application.SiteContentService
+	PermissionService   *application.PermissionService
+	SiteBrowsingService *application.SiteBrowsingService
+	EventBus            *events.JobEventBus
+}
+
+// PresentationLayer groups all presentation components
+type PresentationLayer struct {
+	// Presenters
+	AuditPresenter      *presenters.AuditPresenter
+	JobPresenter        *presenters.JobPresenter
+	ListPresenter       *presenters.ListPresenter
+	PermissionPresenter *presenters.PermissionPresenter
+	SitePresenter       *presenters.SitePresenter
+
+	// Handlers
+	ListHandlers  *handlers.ListHandlers
+	AuditHandlers *handlers.AuditHandlers
+	JobHandlers   *handlers.JobHandlers
+	SSEManager    *handlers.SSEManager
+}
+
+// Dependencies holds all application dependencies organized by layer
+type Dependencies struct {
+	// Infrastructure
+	DB      *database.Database
+	Queries *db.Queries
+	Logger  *logging.Logger
+
+	// Repositories
+	JobRepo contracts.JobRepository
+
+	// Application Layer
+	Services *ApplicationServices
+
+	// Presentation Layer
+	Presentation *PresentationLayer
+}
+
+func loadEnvironment() {
+	if err := godotenv.Load(); err != nil {
+		println("No .env file found, using environment variables")
+	} else {
+		println("Loaded configuration from .env file")
+	}
+}
+
+func initializeLogging(cfg *config.AppConfig) *logging.Logger {
+	logger := logging.NewLogger(cfg.Logging)
+	logging.SetDefault(logger)
+
+	logger.Info("Application starting",
+		"version", "1.0.0",
+		"log_level", cfg.Logging.Level,
+		"log_format", cfg.Logging.Format,
+		"db_path", cfg.Database.Path,
+	)
+
+	return logger
+}
+
+func initializeDatabase(cfg *config.AppConfig, logger *logging.Logger) *database.Database {
+	db, err := database.New(*cfg.Database, logger)
+	if err != nil {
+		logger.Error("Failed to initialize database", "error", err)
+		os.Exit(1)
+	}
+	return db
+}
+
+// RepositoryBundle holds all repository implementations
+type RepositoryBundle struct {
+	JobRepo        contracts.JobRepository
+	AuditRepo      contracts.AuditRepository
+	SiteRepo       contracts.SiteRepository
+	ListRepo       contracts.ListRepository
+	AssignmentRepo contracts.AssignmentRepository
+	ItemRepo       contracts.ItemRepository
+	SharingRepo    contracts.SharingRepository
+
+	// Aggregate repositories
+	SiteContentAggregate contracts.SiteContentAggregateRepository
+	PermissionAggregate  contracts.PermissionAggregateRepository
+}
+
+// buildRepositories creates all repository implementations with read/write database separation
+func buildRepositories(database *database.Database) *RepositoryBundle {
+	// Create base repository for shared functionality
+	baseRepo := repositories.NewBaseRepository(database)
+
+	// Create entity repositories (Tier 1)
+	jobRepo := repositories.NewSqlcJobRepository(database)
+	auditRepo := repositories.NewSqlcAuditRepository(database)
+	siteRepo := repositories.NewSqlcSiteRepository(database)
+	listRepo := repositories.NewSqlcListRepository(database)
+	assignmentRepo := repositories.NewSqlcAssignmentRepository(database)
+	itemRepo := repositories.NewSqlcItemRepository(database)
+	sharingRepo := repositories.NewSqlcSharingRepository(database)
+
+	// Create aggregate repositories (Tier 2) - compose entity repositories
+	siteContentAggregate := repositories.NewSiteContentAggregateRepository(
+		baseRepo,
+		siteRepo,
+		listRepo,
+		jobRepo,
+		assignmentRepo,
+		itemRepo,
+		sharingRepo,
+	)
+	permissionAggregate := repositories.NewPermissionAggregateRepository(
+		baseRepo,
+		assignmentRepo,
+		itemRepo,
+		sharingRepo,
+	)
+
+	return &RepositoryBundle{
+		JobRepo:        jobRepo,
+		AuditRepo:      auditRepo,
+		SiteRepo:       siteRepo,
+		ListRepo:       listRepo,
+		AssignmentRepo: assignmentRepo,
+		ItemRepo:       itemRepo,
+		SharingRepo:    sharingRepo,
+
+		// Aggregate repositories
+		SiteContentAggregate: siteContentAggregate,
+		PermissionAggregate:  permissionAggregate,
+	}
+}
+
+// buildApplicationServices creates all business logic services with proper dependency injection
+func buildApplicationServices(db *database.Database, repos *RepositoryBundle) *ApplicationServices {
+	// Create event bus for job events
+	eventBus := events.NewJobEventBus()
+
+	// Create platform factories
+	auditWorkflowFactory := factories.NewAuditWorkflowFactory(db)
+
+	// Create platform executors
+	siteAuditExecutor := executors.NewSiteAuditExecutor(auditWorkflowFactory)
+
+	// Create job executor registry and register executors
+	registry := application.NewJobExecutorRegistry()
+	registry.RegisterExecutor(jobsdom.JobTypeSiteAudit, siteAuditExecutor)
+
+	// Create job service
+	jobService := application.NewJobService(repos.JobRepo, repos.AuditRepo, registry, nil, eventBus)
+	auditService := application.NewAuditService(jobService, db)
+
+	// Domain services with aggregate repository dependency injection
+	siteContentService := application.NewSiteContentService(
+		repos.SiteContentAggregate,
+	)
+	permissionService := application.NewPermissionService(
+		repos.PermissionAggregate,
+	)
+	siteBrowsingService := application.NewSiteBrowsingService(repos.SiteContentAggregate)
+
+	return &ApplicationServices{
+		JobService:          jobService,
+		AuditService:        auditService,
+		SiteContentService:  siteContentService,
+		PermissionService:   permissionService,
+		SiteBrowsingService: siteBrowsingService,
+		EventBus:            eventBus,
+	}
+}
+
+// buildPresentationLayer creates all presenters and handlers
+func buildPresentationLayer(services *ApplicationServices) *PresentationLayer {
+	// Build presenters (view logic)
+	auditPresenter := presenters.NewAuditPresenter()
+	jobPresenter := presenters.NewJobPresenter()
+	listPresenter := presenters.NewListPresenter()
+	permissionPresenter := presenters.NewPermissionPresenter()
+	sitePresenter := presenters.NewSitePresenter()
+
+	// Build handlers - orchestrate services & presenters
+	sseManager := handlers.NewSSEManager()
+	listHandlers := handlers.NewListHandlers(
+		services.SiteContentService,
+		services.PermissionService,
+		services.SiteBrowsingService,
+		services.JobService,
+		listPresenter,
+		permissionPresenter,
+		sitePresenter,
+	)
+	auditHandlers := handlers.NewAuditHandlers(services.AuditService, auditPresenter, sseManager)
+	jobHandlers := handlers.NewJobHandlers(services.JobService, jobPresenter)
+
+	// Wire up update notifications
+	services.JobService.SetUpdateNotifier(sseManager)
+
+	// Setup event system for job notifications
+	setupEventHandlers(services, sseManager)
+
+	return &PresentationLayer{
+		AuditPresenter:      auditPresenter,
+		JobPresenter:        jobPresenter,
+		ListPresenter:       listPresenter,
+		PermissionPresenter: permissionPresenter,
+		SitePresenter:       sitePresenter,
+		ListHandlers:        listHandlers,
+		AuditHandlers:       auditHandlers,
+		JobHandlers:         jobHandlers,
+		SSEManager:          sseManager,
+	}
+}
+
+// buildDependencies orchestrates the creation of all application dependencies
+func buildDependencies(db *database.Database, logger *logging.Logger) *Dependencies {
+	queries := db.Queries()
+
+	// Build each layer
+	repos := buildRepositories(db)
+	services := buildApplicationServices(db, repos)
+	presentation := buildPresentationLayer(services)
+
+	return &Dependencies{
+		DB:           db,
+		Queries:      queries,
+		JobRepo:      repos.JobRepo,
+		Services:     services,
+		Presentation: presentation,
+		Logger:       logger,
+	}
+}
+
+func setupRoutes(deps *Dependencies, cfg *config.AppConfig) *chi.Mux {
+	r := chi.NewRouter()
+
+	// Middleware
+	setupHTTPLogging(r, deps, cfg)
+	r.Use(middleware.Recoverer)
+
+	// Static assets
+	mountStaticAssets(r)
+
+	// System endpoints
+	setupSystemRoutes(r, deps)
+
+	// Main application routes
+	setupApplicationRoutes(r, deps)
+
+	// Audit routes
+	setupAuditRoutes(r, deps)
+
+	return r
+}
+
+func setupHTTPLogging(r *chi.Mux, deps *Dependencies, cfg *config.AppConfig) {
+	if cfg.HTTPLogPath == "" {
+		// No HTTP logging configured, skip
+		return
+	}
+
+	logFile, err := os.OpenFile(cfg.HTTPLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		deps.Logger.Error("Failed to open HTTP log file", "error", err, "path", cfg.HTTPLogPath)
+		return
+	}
+	// Note: logFile is not closed here as it needs to stay open for the server lifetime
+
+	httpLogger := httplog.NewLogger("spaudit", httplog.Options{
+		Writer: logFile,
+		JSON:   true,
+	})
+	r.Use(httplog.RequestLogger(httpLogger))
+
+	deps.Logger.Info("HTTP request logging enabled", "path", cfg.HTTPLogPath)
+}
+
+func mountStaticAssets(r chi.Router) {
+	sub, _ := fs.Sub(templates.FS, "assets")
+	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.FS(sub))))
+}
+
+func setupSystemRoutes(r *chi.Mux, deps *Dependencies) {
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		stats, err := deps.DB.Health()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response := map[string]interface{}{
+			"status":   "ok",
+			"database": stats,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	})
+
+	r.Get("/events", deps.Presentation.SSEManager.HandleSSEConnection)
+}
+
+func setupApplicationRoutes(r *chi.Mux, deps *Dependencies) {
+	// Main pages
+	r.Get("/", deps.Presentation.ListHandlers.Home)
+
+	// Site management
+	r.Get("/sites", deps.Presentation.ListHandlers.SitesTable)
+	r.Get("/sites/search", deps.Presentation.ListHandlers.SearchSites)
+	r.Get("/sites/{siteID}/lists", deps.Presentation.ListHandlers.SiteListsPage)
+	r.Get("/sites/{siteID}/lists/search", deps.Presentation.ListHandlers.SearchLists)
+
+	// List details
+	r.Get("/sites/{siteID}/lists/{listID}", deps.Presentation.ListHandlers.ListDetail)
+
+	// List tabs (HTMX partials)
+	r.Get("/sites/{siteID}/tabs/{listID}/overview", deps.Presentation.ListHandlers.OverviewTab)
+	r.Get("/sites/{siteID}/tabs/{listID}/assignments", deps.Presentation.ListHandlers.AssignmentsTab)
+	r.Get("/sites/{siteID}/tabs/{listID}/items", deps.Presentation.ListHandlers.ItemsTab)
+	r.Get("/sites/{siteID}/tabs/{listID}/links", deps.Presentation.ListHandlers.LinksTab)
+
+	// Object operations (HTMX partials)
+	r.Get("/sites/{siteID}/object/{otype}/{okey}/assignments", deps.Presentation.ListHandlers.GetObjectAssignments)
+	r.Post("/sites/{siteID}/assignments/{uniqueID}/toggle", deps.Presentation.ListHandlers.ToggleAssignment)
+	r.Post("/sites/{siteID}/items/{itemGUID}/assignments/toggle", deps.Presentation.ListHandlers.ToggleItemAssignments)
+
+	// Sharing link operations (HTMX partials)
+	r.Get("/sites/{siteID}/sharing-links/{linkID}/members", deps.Presentation.ListHandlers.GetSharingLinkMembers)
+	r.Post("/sites/{siteID}/sharing-links/{linkID}/members/toggle", deps.Presentation.ListHandlers.ToggleSharingLinkMembers)
+}
+
+func setupAuditRoutes(r *chi.Mux, deps *Dependencies) {
+	// Audit operations
+	r.Post("/audit", deps.Presentation.AuditHandlers.RunAudit)
+	r.Get("/audit/status", deps.Presentation.AuditHandlers.GetAuditStatus)
+	r.Get("/audit/active", deps.Presentation.AuditHandlers.ListActiveAudits)
+
+	// Job management
+	r.Get("/jobs", deps.Presentation.JobHandlers.ListJobs)
+
+	// Job cancellation
+	r.Post("/jobs/{jobID}/cancel", deps.Presentation.JobHandlers.CancelJob)
+}
+
+func startServer(router *chi.Mux, addr string, logger *logging.Logger) {
+	logger.Info("Server starting", "address", addr)
+	if err := http.ListenAndServe(addr, router); err != nil {
+		logger.Error("Server failed", "error", err, "address", addr)
+		os.Exit(1)
+	}
+}
+
+// setupEventHandlers wires up the event handlers for job notifications
+func setupEventHandlers(services *ApplicationServices, sseManager *handlers.SSEManager) {
+	// Create event handlers using the event bus from services
+	notificationHandlers := events.NewNotificationEventHandlers(sseManager, services.SiteBrowsingService)
+
+	// Register all event handlers with the existing event bus
+	notificationHandlers.RegisterHandlers(services.EventBus)
+}

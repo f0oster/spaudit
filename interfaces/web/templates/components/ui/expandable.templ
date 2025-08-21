@@ -1,0 +1,49 @@
+package ui
+
+templ ExpandableToggle(targetID string, endpoint string, buttonText string, loadingID string) {
+	<button 
+		class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors px-2 py-1 text-sm"
+		hx-post={ endpoint }
+		hx-target={ "#" + targetID }
+		hx-swap="outerHTML"
+		hx-include={ "#" + targetID }
+		hx-indicator={ "#" + loadingID }
+		hx-on::before-request="
+			this.classList.add('loading');
+			this.textContent = 'Loading...';
+			this.disabled = true;
+		"
+		hx-on::after-request="
+			this.classList.remove('loading');
+			this.disabled = false;
+		"
+		hx-on::after-settle="
+			// Restore original text if request failed
+			if (!this.closest('tr').querySelector('#' + '{ targetID }').style.display !== 'none') {
+				this.textContent = '{ buttonText }';
+			}
+		"
+	>
+		{ buttonText }
+	</button>
+	<div id={ loadingID } class="htmx-indicator text-xs text-slate-500 ml-2">
+		<span class="animate-pulse">Loading...</span>
+	</div>
+}
+
+templ ExpandableRow(rowID string, content templ.Component) {
+	<tr id={ rowID } class="expandable-row">
+		<td colspan="100%" class="px-6 py-4">
+			<div class="expandable-content space-y-4 slide-down">
+				@content
+			</div>
+		</td>
+	</tr>
+}
+
+templ LoadingIndicator(id string) {
+	<div id={ id } class="htmx-indicator inline-flex items-center gap-2 text-sm text-slate-500">
+		<div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+		<span>Loading...</span>
+	</div>
+}

@@ -1,0 +1,121 @@
+package dashboard
+
+// AuditForm renders the main audit configuration form with all options
+templ AuditForm() {
+	<div class="mb-8">
+		<div class="mb-4">
+			<h1 class="text-2xl font-bold text-slate-900 mb-2">SharePoint Permissions Audit</h1>
+			<p class="text-slate-600">Audit SharePoint sites to discover permissions, sharing links, and security risks.</p>
+		</div>
+		
+		<div class="bg-white border rounded-xl shadow-sm p-6">
+			<div class="space-y-4">
+			<form
+				hx-post="/audit"
+				hx-target="#audit-status"
+				hx-swap="innerHTML"
+				hx-indicator="#audit-ind"
+				hx-on::after-request="
+					if (event.detail.xhr.status === 200) {
+						document.getElementById('jobs-section').classList.remove('hidden');
+						htmx.trigger('#jobs-list', 'refresh-jobs');
+					}
+				"
+			>
+				
+				@SiteUrlInput()
+				@AuditOptions()
+				@AdvancedOptions()
+				@SubmitButtonAndStatus()
+			</form>
+			</div>
+			<div id="audit-status" class="text-sm mt-4"></div>
+		</div>
+	</div>
+}
+
+// SiteUrlInput renders the site URL input field
+templ SiteUrlInput() {
+	<div>
+		<label for="site_url" class="block text-sm font-medium text-slate-700 mb-2">SharePoint Site URL</label>
+		<input name="site_url" id="site_url" type="url" placeholder="https://contoso.sharepoint.com/sites/TargetSite"
+			   class="w-full border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
+	</div>
+}
+
+// AuditOptions renders the main audit configuration options
+templ AuditOptions() {
+	<div>
+		<label class="block text-sm font-medium text-slate-700 mb-3">Audit Options</label>
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			@AuditOptionCheckbox("scan_individual_items", "Individual Item Scanning", "Scan individual files and folders for unique permissions", true)
+			@AuditOptionCheckbox("analyze_sharing_links", "Sharing Link Analysis", "Analyze sharing links and their security implications", true)
+			@AuditOptionCheckbox("skip_hidden", "Skip Hidden Items", "Ignore system and hidden files in the audit", false)
+			@AdvancedOptionsToggle()
+		</div>
+	</div>
+}
+
+// AuditOptionCheckbox renders a single audit option checkbox with description
+templ AuditOptionCheckbox(id string, label string, description string, checked bool) {
+	<div class="flex items-start space-x-3">
+		<input type="checkbox" id={ id } name={ id } checked?={ checked }
+			   class="mt-1 h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" />
+		<div class="flex-1">
+			<label for={ id } class="text-sm font-medium text-slate-700 cursor-pointer">{ label }</label>
+			<p class="text-xs text-slate-500 mt-1">{ description }</p>
+		</div>
+	</div>
+}
+
+// AdvancedOptionsToggle renders the toggle for showing advanced options
+templ AdvancedOptionsToggle() {
+	<div class="flex items-start space-x-3">
+		<input type="checkbox" id="show_advanced" 
+			   hx-on:change="
+				 if (this.checked) {
+				   document.getElementById('advanced-options').classList.remove('hidden');
+				 } else {
+				   document.getElementById('advanced-options').classList.add('hidden');
+				 }
+			   "
+			   class="mt-1 h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" />
+		<div class="flex-1">
+			<label for="show_advanced" class="text-sm font-medium text-slate-700 cursor-pointer">Advanced Options</label>
+			<p class="text-xs text-slate-500 mt-1">Configure batch size and timeout settings</p>
+		</div>
+	</div>
+}
+
+// AdvancedOptions renders the collapsible advanced configuration section
+templ AdvancedOptions() {
+	<div id="advanced-options" class="hidden space-y-4 pt-4 border-t border-slate-200">
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			@AdvancedOptionInput("batch_size", "Batch Size", "number", "100", "Number of items to process in each batch (default: 100)", "1", "1000")
+			@AdvancedOptionInput("timeout", "Timeout (seconds)", "number", "300", "Maximum time to wait for audit completion (default: 300)", "30", "3600")
+		</div>
+	</div>
+}
+
+// AdvancedOptionInput renders an individual advanced option input field
+templ AdvancedOptionInput(id string, label string, inputType string, placeholder string, helpText string, min string, max string) {
+	<div>
+		<label for={ id } class="block text-sm font-medium text-slate-700 mb-2">{ label }</label>
+		<input name={ id } id={ id } type={ inputType } placeholder={ placeholder } min={ min } max={ max }
+			   class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+		<p class="text-xs text-slate-500 mt-1">{ helpText }</p>
+	</div>
+}
+
+// SubmitButtonAndStatus renders the form submission button and loading indicator
+templ SubmitButtonAndStatus() {
+	<div class="flex flex-col sm:flex-row gap-3 pt-4">
+		<button type="submit" class="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium">
+			🔍 Start Background Audit
+		</button>
+		<div id="audit-ind" class="htmx-indicator inline-flex items-center gap-2 text-sm text-slate-500">
+			<div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+			<span>🔍 Starting audit...</span>
+		</div>
+	</div>
+}

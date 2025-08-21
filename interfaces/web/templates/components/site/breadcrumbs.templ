@@ -1,0 +1,12 @@
+package site
+
+import "spaudit/interfaces/web/presenters"
+
+// SiteBreadcrumbs renders breadcrumb navigation for site pages
+templ SiteBreadcrumbs(site presenters.SiteWithMetadata) {
+	<div class="mb-4 flex items-center gap-2 text-sm">
+		<a href="/" class="text-blue-600 hover:text-blue-700 hover:underline">← Dashboard</a>
+		<span class="text-slate-400">•</span>
+		<span class="text-slate-600">{ site.Title }</span>
+	</div>
+}

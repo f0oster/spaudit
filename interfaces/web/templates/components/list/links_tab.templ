@@ -1,0 +1,97 @@
+package list
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+	"spaudit/interfaces/web/templates/components/ui"
+)
+
+// ListLinksTab renders the sharing links tab content with expandable member details
+templ ListLinksTab(links []presenters.SharingLink) {
+	if len(links) == 0 {
+		@ui.EmptyState("No Sharing Links Found", "This list doesn't contain any items with sharing links, or sharing analysis wasn't performed.", "🔗")
+	} else {
+		@ui.SharingLinksTable() {
+			@ui.TableHeader() {
+				@ui.TableHeaderCell("Item", "w-2/5")
+				@ui.TableHeaderCell("Link Type", "w-1/6")
+				@ui.TableHeaderCell("Access", "w-1/8")
+				@ui.TableHeaderCell("Status", "w-1/8")
+				@ui.TableHeaderCell("Members", "w-1/8")
+				@ui.TableHeaderCell("Created", "w-1/6")
+			}
+			@ui.TableBody() {
+				for _, link := range links {
+					@ui.TableRow(true, "members-row-" + fmt.Sprintf("%s", link.LinkID)) {
+						@ui.TableCell() {
+							<div class="flex items-center gap-3">
+								<div class="flex-shrink-0">
+									@ui.ItemTypeTag(link.IsFile, link.IsFolder)
+								</div>
+								<div class="min-w-0 flex-1">
+									<div class="font-semibold text-slate-900 truncate" title={ link.ItemName }>{ link.ItemName }</div>
+									<div class="space-y-1 mt-1">
+										if link.ItemURL != "" {
+											<div class="text-xs text-slate-500">
+												@ui.LinkButton("View Item", link.ItemURL, true)
+											</div>
+										}
+										if link.URL != "" {
+											<div class="text-xs text-blue-600">
+												@ui.LinkButton("Sharing Link URL", link.URL, true)
+											</div>
+										}
+									</div>
+								</div>
+							</div>
+						}
+						@ui.TableCell() {
+							<div class="space-y-1">
+								<div class="text-sm font-semibold text-slate-900">{ link.LinkKindName }</div>
+								<div class="flex flex-wrap gap-1">
+									if link.IsDefault {
+										@ui.Badge("Default", "success")
+									}
+								</div>
+							</div>
+						}
+						@ui.TableCell() {
+							<div class="space-y-1">
+								<div class="text-sm font-semibold text-slate-900">{ link.ScopeName }</div>
+								if link.IsEditLink {
+									@ui.Badge("Edit", "warning")
+								} else {
+									@ui.Badge("View", "success")
+								}
+							</div>
+						}
+						@ui.TableCell() {
+							if link.IsActive {
+								@ui.Badge("Active", "success")
+							} else {
+								@ui.Badge("Inactive", "danger")
+							}
+						}
+						@ui.TableCell() {
+							@ui.ActionButton(fmt.Sprintf("%d members", link.ActualMembersCount), "/sites/" + fmt.Sprintf("%d", link.SiteID) + "/sharing-links/" + fmt.Sprintf("%s", link.LinkID) + "/members/toggle", "members-row-" + fmt.Sprintf("%s", link.LinkID), "default")
+						}
+						@ui.TableCell() {
+							if link.CreatedAt != "" {
+								<div class="text-xs text-slate-600">{ link.CreatedAt }</div>
+								if link.CreatedByTitle != "" {
+									<div class="text-xs text-slate-500">by { link.CreatedByTitle }</div>
+								}
+							}
+						}
+					}
+					@ui.TableExpandableRow("members-row-" + fmt.Sprintf("%s", link.LinkID), true, "6") {
+						<div class="text-center py-4 text-slate-500">
+							<div class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+							<div class="text-sm">Loading sharing link members...</div>
+						</div>
+					}
+				}
+			}
+		}
+	}
+}

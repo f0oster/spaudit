@@ -1,0 +1,26 @@
+package sharepoint
+
+import "spaudit/domain/sharepoint"
+
+templ PrincipalIcon(principalType int32) {
+	switch int64(principalType) {
+	case sharepoint.PrincipalTypeUser:
+		<span class="principal-icon principal-icon--user">👤</span>
+	case sharepoint.PrincipalTypeSecurity, sharepoint.PrincipalTypeSharePointGroup:
+		<span class="principal-icon principal-icon--group">👥</span>
+	default:
+		<span class="principal-icon principal-icon--unknown">?</span>
+	}
+}
+
+templ PrincipalBadge(principal *sharepoint.Principal) {
+	<div class="flex items-center gap-2">
+		@PrincipalIcon(int32(principal.PrincipalType))
+		<div class="flex flex-col">
+			<span class="font-medium text-sm">{ principal.GetDisplayName() }</span>
+			if principal.Email != "" {
+				<span class="text-xs text-slate-500">{ principal.Email }</span>
+			}
+		</div>
+	</div>
+}

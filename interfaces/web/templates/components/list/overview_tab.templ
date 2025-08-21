@@ -1,0 +1,23 @@
+package list
+
+import (
+	"spaudit/interfaces/web/presenters"
+	"spaudit/interfaces/web/templates/components/analytics"
+)
+
+// ListOverviewTab renders the overview tab content for a list
+templ ListOverviewTab(data presenters.ListAnalytics) {
+	<div class="space-y-6">
+		<!-- Quick Stats Overview -->
+		@analytics.QuickStats(data)
+		
+		<!-- Security Recommendations -->
+		@analytics.SecurityRecommendations(data)
+		
+		<!-- Main Analytics Grid -->
+		@analytics.AnalyticsGrid(data)
+		
+		<!-- Permission Scope Overview -->
+		@analytics.PermissionScopeOverview(data)
+	</div>
+}

@@ -1,0 +1,61 @@
+package analytics
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+)
+
+// AnalyticsGrid renders the main analytics cards in a grid layout
+templ AnalyticsGrid(analytics presenters.ListAnalytics) {
+	<div class="grid lg:grid-cols-3 gap-6">
+		<!-- List Information -->
+		@AnalyticsCard("List Information") {
+			<div class="space-y-0">
+				@LongTextMetric("Title", analytics.List.Title, "SharePoint list display name")
+				@LongTextMetric("URL", analytics.List.URL, "Full SharePoint URL")
+				@CompactMetric("Web", analytics.List.WebTitle, analytics.List.WebID)
+				@MetricItem("Total Items", fmt.Sprintf("%d", analytics.List.ItemCount), "", "primary")
+				@PermissionScopeMetric(analytics.List.HasUnique)
+			</div>
+		}
+		
+		<!-- Risk Assessment -->
+		@AnalyticsCard("Security Risk Assessment") {
+			@RiskMeter(analytics.PermissionRiskLevel, analytics.PermissionRiskScore, analytics)
+			<div class="mt-4 pt-4 border-t border-slate-100">
+				<div class="text-sm text-slate-600">
+					if analytics.PermissionRiskLevel == "Low" {
+						<div class="flex items-start gap-2">
+							<span class="text-green-600">✓</span>
+							<div>
+								<div class="font-medium text-green-800">Good Security Posture</div>
+								<div class="text-xs text-green-600 mt-1">Minimal unique permissions and limited sharing</div>
+							</div>
+						</div>
+					} else if analytics.PermissionRiskLevel == "Medium" {
+						<div class="flex items-start gap-2">
+							<span class="text-amber-600">⚠</span>
+							<div>
+								<div class="font-medium text-amber-800">Moderate Risk</div>
+								<div class="text-xs text-amber-600 mt-1">Some unique permissions or sharing links present</div>
+							</div>
+						</div>
+					} else if analytics.PermissionRiskLevel == "High" {
+						<div class="flex items-start gap-2">
+							<span class="text-red-600">⚠</span>
+							<div>
+								<div class="font-medium text-red-800">High Risk</div>
+								<div class="text-xs text-red-600 mt-1">Many unique permissions and sharing links detected</div>
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+		}
+		
+		<!-- Permission Breakdown -->
+		@AnalyticsCard("Permission Analysis") {
+			@PermissionBreakdown(analytics)
+		}
+	</div>
+}

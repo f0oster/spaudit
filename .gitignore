@@ -1,0 +1,85 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Database files
+*.db
+*.sq3
+*.sq3-shm
+*.sq3-wal
+*.sqlite
+*.sqlite3
+
+# Certificate files
+*.pfx
+*.p12
+*.crt
+*.key
+*.pem
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+dist/
+build/
+__debug_bin*
+
+# SharePoint specific
+sp_config.json
+auth_config.json
+
+# Claude AI files
+.claude
+claude_*
+*claude*
+
+*.md
+!README.md
+!readme.md
+!README.MD
+!docs/ARCHITECTURE.md

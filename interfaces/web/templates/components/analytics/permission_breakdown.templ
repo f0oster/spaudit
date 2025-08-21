@@ -1,0 +1,71 @@
+package analytics
+
+import (
+	"fmt"
+	"spaudit/interfaces/web/presenters"
+)
+
+// PermissionBreakdown renders role and principal type analysis
+templ PermissionBreakdown(analytics presenters.ListAnalytics) {
+	<div class="space-y-4">
+		<!-- Role Distribution -->
+		@RoleDistribution(analytics)
+		
+		<!-- Principal Types -->
+		@PrincipalTypesGrid(analytics)
+		
+		<!-- Sharing Link Types Breakdown -->
+		@SharingLinkTypeBreakdown(analytics)
+	</div>
+}
+
+// RoleDistribution renders role-based permission breakdown
+templ RoleDistribution(analytics presenters.ListAnalytics) {
+	<div>
+		<h4 class="text-sm font-semibold text-slate-800 mb-4">Role Distribution</h4>
+		<div class="space-y-2">
+			@RoleBar("Full Control", analytics.FullControlCount, analytics.TotalAssignments, "bg-red-500")
+			@RoleBar("Contribute", analytics.ContributeCount, analytics.TotalAssignments, "bg-orange-500")
+			@RoleBar("Read", analytics.ReadCount, analytics.TotalAssignments, "bg-blue-500")
+			@RoleBar("Limited Access", analytics.LimitedAccessCount, analytics.TotalAssignments, "bg-slate-400")
+			@RoleBar("Other Roles", analytics.OtherRolesCount, analytics.TotalAssignments, "bg-purple-500")
+		</div>
+	</div>
+}
+
+// PrincipalTypesGrid renders principal types in a grid layout
+templ PrincipalTypesGrid(analytics presenters.ListAnalytics) {
+	<div>
+		<h4 class="text-sm font-semibold text-slate-800 mb-4">Principal Types</h4>
+		<div class="grid grid-cols-3 gap-3 text-center">
+			<div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 hover:scale-105">
+				<div class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent mb-1">{ fmt.Sprintf("%d", analytics.UserCount) }</div>
+				<div class="text-xs font-semibold text-blue-700">Users</div>
+			</div>
+			<div class="bg-gradient-to-br from-emerald-50 to-green-100 border border-emerald-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 hover:scale-105">
+				<div class="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-green-700 bg-clip-text text-transparent mb-1">{ fmt.Sprintf("%d", analytics.GroupCount) }</div>
+				<div class="text-xs font-semibold text-emerald-700">Groups</div>
+			</div>
+			<div class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 hover:scale-105">
+				<div class="text-3xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent mb-1">{ fmt.Sprintf("%d", analytics.SharingLinkUsers) }</div>
+				<div class="text-xs font-semibold text-purple-700">Sharing Link Users</div>
+			</div>
+		</div>
+	</div>
+}
+
+// RoleBar renders a progress bar for role distribution
+templ RoleBar(roleName string, count int, total int, colorClass string) {
+	if count > 0 {
+		<div class="flex items-center gap-3">
+			<div class="w-20 text-xs font-medium text-slate-600 text-right">{ roleName }</div>
+			<div class="flex-1 bg-slate-200 rounded-full h-2">
+				<div 
+					class={ "h-2 rounded-full transition-all duration-500", colorClass }
+					style={ fmt.Sprintf("width: %.1f%%", float64(count)/float64(total)*100) }
+				></div>
+			</div>
+			<div class="text-sm font-bold text-slate-900 w-8">{ fmt.Sprintf("%d", count) }</div>
+		</div>
+	}
+}

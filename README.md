@@ -15,6 +15,26 @@ A SharePoint permissions auditing application for analyzing site permissions, sh
 
 The project is suitable for testing only until it reaches a stable release.
 
+## Screenshots
+
+### Dashboard
+![Dashboard](./docs/screenshots/dashboard.png?raw=true "Main dashboard showing audit overview and recent jobs")
+
+### Site Lists Overview  
+![Site Lists](./docs/screenshots/site_lists.png?raw=true "Site lists view showing permission summaries")
+
+### Document Library Overview
+![Library Overview](./docs/screenshots/site_documentlibrary_overview.png?raw=true "Document library overview with metadata and stats")
+
+### Document Library Permissions
+![Library Permissions](./docs/screenshots/site_documentlibrary_listperms.png?raw=true "Document library permission assignments")
+
+### Custom Item Permissions
+![Custom Item Permissions](./docs/screenshots/site_documentlibrary_customitemperms.png?raw=true "Individual items with unique permissions")
+
+### Sharing Links Analysis
+![Sharing Links](./docs/screenshots/site_documentlibrary_sharinglinks.png?raw=true "Sharing links governance and analysis")
+
 ## Quick Start
 
 ### Prerequisites

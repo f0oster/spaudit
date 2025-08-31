@@ -15,6 +15,52 @@ A SharePoint permissions auditing application for analyzing site permissions, sh
 
 The project is suitable for testing only until it reaches a stable release.
 
+## Quick Start
+
+### Prerequisites
+- **Go 1.25+ installed**
+- **Mage build tool** - Install with `go install github.com/magefile/mage@latest`
+- **SharePoint admin access**  
+- **Entra ID app registration** with SharePoint permissions
+- **Valid certificate (.pfx file)**
+
+### Setup
+
+#### 1. Create Entra ID App Registration
+```bash
+# Create app registration in Azure portal with:
+# - Name: <your-app-name>
+# - API Permissions: SharePoint -> Sites.FullControl.All
+# - Authentication: Certificate (upload your .cer public certificate)
+# - Copy Tenant ID and Application (Client) ID
+```
+
+#### 2. Clone and build
+```bash
+git clone https://github.com/f0oster/spaudit && cd spaudit
+mage bootstrap
+```
+
+#### 3. Configure environment
+```bash
+cd cmd/server
+cp ../../.env.example .env
+# Edit .env with your required values:
+# SP_TENANT_ID=your-tenant-id
+# SP_CLIENT_ID=your-client-id  
+# SP_CERT_PATH=./path/to/cert.pfx
+```
+
+#### 4. Build and start server
+```bash
+cd ..
+mage build
+cd cmd/server
+./server.exe
+```
+
+#### 5. Open http://localhost:8080
+
 ## Screenshots
 
 ### Dashboard
@@ -34,34 +80,6 @@ The project is suitable for testing only until it reaches a stable release.
 
 ### Sharing Links Analysis
 ![Sharing Links](./docs/screenshots/site_documentlibrary_sharinglinks.png?raw=true "Sharing links governance and analysis")
-
-## Quick Start
-
-### Prerequisites
-- Go 1.25+ installed
-- SharePoint admin access  
-- Valid certificate (.pfx file)
-
-### Setup
-```bash
-# 1. Clone and build
-git clone <repo> && cd spaudit
-go mod tidy && go build ./cmd/server
-
-# 2. Configure environment
-cd cmd/server
-cp .env.example .env
-# Edit these required values:
-# SP_TENANT_ID=your-tenant-id
-# SP_CLIENT_ID=your-client-id  
-# SP_CERT_PATH=./path/to/cert.pfx
-
-# 3. Initialize database and start server
-./server.exe -migrate
-./server.exe
-
-# 4. Open http://localhost:8080
-```
 
 ## What It Does
 
@@ -117,7 +135,7 @@ The application follows clean architecture patterns with clear separation of con
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Web UI        │    │  Background      │    │  SharePoint     │
-│   (HTMX/HTMX)   │◄──►│  Job System      │◄──►│  API Client     │
+│ (HTMX/Tailwind) │◄──►│  Job System      │◄──►│  API Client     │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼
@@ -158,36 +176,6 @@ The application follows clean architecture patterns with clear separation of con
 - **Audit Runs**: Each audit creates an immutable snapshot with unique `audit_run_id`
 - **Historical Data**: Compare security posture changes over time
 - **Performance Tracking**: Monitor audit execution and coverage metrics
-
-## Common Tasks
-
-### Troubleshooting Failed Audits
-```bash
-# Check recent job status
-sqlite3 spaudit.db "SELECT id, status, error, created_at FROM jobs ORDER BY created_at DESC LIMIT 5;"
-
-# Enable debug logging
-export LOG_LEVEL=debug
-./server.exe
-
-# Check SharePoint connectivity
-# Look for "spclient" entries in logs for API responses
-```
-
-### Performance Tuning
-- **Large Sites**: Reduce batch size to 50-100 items
-- **API Timeouts**: Increase timeout for sites with >10,000 items  
-- **Memory Usage**: Avoid running multiple concurrent audits
-- **Database**: Use SSD storage for better SQLite performance
-
-### Certificate Issues
-```bash
-# Verify certificate path and permissions
-ls -la ./certificates/cert.pfx
-
-# Test certificate (if password-protected)
-openssl pkcs12 -in cert.pfx -noout
-```
 
 ## Development
 
@@ -230,51 +218,20 @@ spaudit/
 └── gen/db/               # Generated database code
 ```
 
-## API Reference
+## Dependencies
 
-### Key Endpoints
-- `GET /` - Dashboard
-- `POST /audit` - Start site audit
-- `GET /jobs` - Job list and status
-- `GET /sites/{id}/lists` - Site content browser
-- `GET /events` - Server-Sent Events for real-time updates
+### Backend
+- **Go 1.25**
+- **SQLite** (modernc.org/sqlite) - Database
+- **SQLC** - Type-safe SQL code generation
+- **Chi** (github.com/go-chi/chi/v5) - HTTP router
+- **Gosip** (github.com/koltyakov/gosip) - SharePoint client
+- **Testify** (github.com/stretchr/testify) - Testing
 
-### Real-time Updates
-The UI automatically updates using Server-Sent Events:
-- Job progress updates
-- Completion notifications
-- Error alerts
-
-## Troubleshooting
-
-### SharePoint Authentication
-- **Certificate not found**: Verify `SP_CERT_PATH` points to valid .pfx file
-- **Permission errors**: Ensure service principal has correct SharePoint permissions
-- **Authentication failures**: Check `SP_TENANT_ID` and `SP_CLIENT_ID` match Azure app registration
-
-### Database Issues
-- **Migration failures**: Check database file write permissions
-- **Lock timeouts**: Restart server, avoid concurrent access
-- **Corruption**: Delete database file and re-run with `-migrate` flag
-
-### Performance Issues  
-- **Slow audits**: Adjust batch size for large sites
-- **Memory usage**: Limit concurrent audits
-- **API timeouts**: Increase timeout for sites with many items
-
-### Development Issues
-- **Template errors**: Run `templ generate` after .templ changes
-- **Database errors**: Run `sqlc generate` after schema/query changes
-- **Build failures**: Run `go mod tidy` to resolve dependencies
-
-## Technology Stack
-
-- **Go 1.25**: Backend language
-- **SQLite**: Database with SQLC for type-safe queries  
-- **HTMX + Tailwind**: Frontend framework
-- **Templ**: Type-safe HTML templates
-- **Server-Sent Events**: Real-time UI updates
-- **SharePoint REST API**: Certificate-based authentication
+### Frontend
+- **Templ** (github.com/a-h/templ) - HTML templates
+- **HTMX** - Frontend interactivity
+- **Tailwind CSS** - Styling
 
 ## Acknowledgments
 

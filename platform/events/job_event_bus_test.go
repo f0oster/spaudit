@@ -29,13 +29,11 @@ func TestJobEventBus_PublishJobCompleted_Success(t *testing.T) {
 	eventBus := NewJobEventBus()
 	job := createTestJob("test-job-1", jobs.JobStatusCompleted)
 
-	var receivedEvent events.JobCompletedEvent
-	var handlerCalled bool
+	done := make(chan events.JobCompletedEvent, 1)
 
 	// Subscribe to the event
 	eventBus.OnJobCompleted(func(event events.JobCompletedEvent) {
-		receivedEvent = event
-		handlerCalled = true
+		done <- event
 	})
 
 	// Act
@@ -45,14 +43,15 @@ func TestJobEventBus_PublishJobCompleted_Success(t *testing.T) {
 	}
 	eventBus.PublishJobCompleted(testEvent)
 
-	// Wait for async handler execution
-	time.Sleep(10 * time.Millisecond)
-
 	// Assert
-	assert.True(t, handlerCalled, "Event handler should have been called")
-	assert.Equal(t, testEvent.Job.ID, receivedEvent.Job.ID)
-	assert.Equal(t, testEvent.Job.Status, receivedEvent.Job.Status)
-	assert.False(t, receivedEvent.Timestamp.IsZero())
+	select {
+	case receivedEvent := <-done:
+		assert.Equal(t, testEvent.Job.ID, receivedEvent.Job.ID)
+		assert.Equal(t, testEvent.Job.Status, receivedEvent.Job.Status)
+		assert.False(t, receivedEvent.Timestamp.IsZero())
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Handler was not called within timeout")
+	}
 }
 
 func TestJobEventBus_PublishJobFailed_Success(t *testing.T) {
@@ -60,12 +59,10 @@ func TestJobEventBus_PublishJobFailed_Success(t *testing.T) {
 	eventBus := NewJobEventBus()
 	job := createTestJob("test-job-2", jobs.JobStatusFailed)
 
-	var receivedEvent events.JobFailedEvent
-	var handlerCalled bool
+	done := make(chan events.JobFailedEvent, 1)
 
 	eventBus.OnJobFailed(func(event events.JobFailedEvent) {
-		receivedEvent = event
-		handlerCalled = true
+		done <- event
 	})
 
 	// Act
@@ -76,13 +73,14 @@ func TestJobEventBus_PublishJobFailed_Success(t *testing.T) {
 	}
 	eventBus.PublishJobFailed(testEvent)
 
-	// Wait for async handler execution
-	time.Sleep(10 * time.Millisecond)
-
 	// Assert
-	assert.True(t, handlerCalled)
-	assert.Equal(t, "test-job-2", receivedEvent.Job.ID)
-	assert.Equal(t, "Test error message", receivedEvent.Error)
+	select {
+	case receivedEvent := <-done:
+		assert.Equal(t, "test-job-2", receivedEvent.Job.ID)
+		assert.Equal(t, "Test error message", receivedEvent.Error)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Handler was not called within timeout")
+	}
 }
 
 func TestJobEventBus_PublishJobCancelled_Success(t *testing.T) {
@@ -90,12 +88,10 @@ func TestJobEventBus_PublishJobCancelled_Success(t *testing.T) {
 	eventBus := NewJobEventBus()
 	job := createTestJob("test-job-3", jobs.JobStatusCancelled)
 
-	var receivedEvent events.JobCancelledEvent
-	var handlerCalled bool
+	done := make(chan events.JobCancelledEvent, 1)
 
 	eventBus.OnJobCancelled(func(event events.JobCancelledEvent) {
-		receivedEvent = event
-		handlerCalled = true
+		done <- event
 	})
 
 	// Act
@@ -105,13 +101,14 @@ func TestJobEventBus_PublishJobCancelled_Success(t *testing.T) {
 	}
 	eventBus.PublishJobCancelled(testEvent)
 
-	// Wait for async handler execution
-	time.Sleep(10 * time.Millisecond)
-
 	// Assert
-	assert.True(t, handlerCalled)
-	assert.Equal(t, "test-job-3", receivedEvent.Job.ID)
-	assert.Equal(t, jobs.JobStatusCancelled, receivedEvent.Job.Status)
+	select {
+	case receivedEvent := <-done:
+		assert.Equal(t, "test-job-3", receivedEvent.Job.ID)
+		assert.Equal(t, jobs.JobStatusCancelled, receivedEvent.Job.Status)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Handler was not called within timeout")
+	}
 }
 
 func TestJobEventBus_PublishSiteAuditCompleted_Success(t *testing.T) {
@@ -119,12 +116,10 @@ func TestJobEventBus_PublishSiteAuditCompleted_Success(t *testing.T) {
 	eventBus := NewJobEventBus()
 	job := createTestJob("site-audit-job", jobs.JobStatusCompleted)
 
-	var receivedEvent events.SiteAuditCompletedEvent
-	var handlerCalled bool
+	done := make(chan events.SiteAuditCompletedEvent, 1)
 
 	eventBus.OnSiteAuditCompleted(func(event events.SiteAuditCompletedEvent) {
-		receivedEvent = event
-		handlerCalled = true
+		done <- event
 	})
 
 	// Act
@@ -135,13 +130,14 @@ func TestJobEventBus_PublishSiteAuditCompleted_Success(t *testing.T) {
 	}
 	eventBus.PublishSiteAuditCompleted(testEvent)
 
-	// Wait for async handler execution
-	time.Sleep(10 * time.Millisecond)
-
 	// Assert
-	assert.True(t, handlerCalled)
-	assert.Equal(t, "https://test.sharepoint.com", receivedEvent.SiteURL)
-	assert.Equal(t, "site-audit-job", receivedEvent.Job.ID)
+	select {
+	case receivedEvent := <-done:
+		assert.Equal(t, "https://test.sharepoint.com", receivedEvent.SiteURL)
+		assert.Equal(t, "site-audit-job", receivedEvent.Job.ID)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Handler was not called within timeout")
+	}
 }
 
 func TestJobEventBus_MultipleHandlers_AllCalled(t *testing.T) {
@@ -149,21 +145,27 @@ func TestJobEventBus_MultipleHandlers_AllCalled(t *testing.T) {
 	eventBus := NewJobEventBus()
 	job := createTestJob("multi-handler-job", jobs.JobStatusCompleted)
 
-	handler1Called := false
-	handler2Called := false
-	handler3Called := false
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	handler1Done := make(chan bool, 1)
+	handler2Done := make(chan bool, 1)
+	handler3Done := make(chan bool, 1)
 
 	// Subscribe multiple handlers to the same event
 	eventBus.OnJobCompleted(func(event events.JobCompletedEvent) {
-		handler1Called = true
+		handler1Done <- true
+		wg.Done()
 	})
 
 	eventBus.OnJobCompleted(func(event events.JobCompletedEvent) {
-		handler2Called = true
+		handler2Done <- true
+		wg.Done()
 	})
 
 	eventBus.OnJobCompleted(func(event events.JobCompletedEvent) {
-		handler3Called = true
+		handler3Done <- true
+		wg.Done()
 	})
 
 	// Act
@@ -173,13 +175,23 @@ func TestJobEventBus_MultipleHandlers_AllCalled(t *testing.T) {
 	}
 	eventBus.PublishJobCompleted(testEvent)
 
-	// Wait for all async handlers
-	time.Sleep(20 * time.Millisecond)
+	// Wait for all handlers to complete
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
 
-	// Assert
-	assert.True(t, handler1Called, "Handler 1 should have been called")
-	assert.True(t, handler2Called, "Handler 2 should have been called")
-	assert.True(t, handler3Called, "Handler 3 should have been called")
+	// Assert all handlers were called within timeout
+	select {
+	case <-done:
+		// Verify each handler was called
+		assert.True(t, len(handler1Done) == 1, "Handler 1 should have been called")
+		assert.True(t, len(handler2Done) == 1, "Handler 2 should have been called")
+		assert.True(t, len(handler3Done) == 1, "Handler 3 should have been called")
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Not all handlers were called within timeout")
+	}
 }
 
 func TestJobEventBus_NoHandlers_DoesNotPanic(t *testing.T) {
@@ -290,21 +302,21 @@ func TestJobEventBus_EventIsolation_HandlersNotCrossCalled(t *testing.T) {
 	eventBus := NewJobEventBus()
 	job := createTestJob("isolation-job", jobs.JobStatusCompleted)
 
-	completedCalled := false
-	failedCalled := false
-	cancelledCalled := false
+	completedDone := make(chan bool, 1)
+	failedDone := make(chan bool, 1)
+	cancelledDone := make(chan bool, 1)
 
 	// Subscribe to different event types
 	eventBus.OnJobCompleted(func(event events.JobCompletedEvent) {
-		completedCalled = true
+		completedDone <- true
 	})
 
 	eventBus.OnJobFailed(func(event events.JobFailedEvent) {
-		failedCalled = true
+		failedDone <- true
 	})
 
 	eventBus.OnJobCancelled(func(event events.JobCancelledEvent) {
-		cancelledCalled = true
+		cancelledDone <- true
 	})
 
 	// Act - publish only JobCompleted event
@@ -313,11 +325,21 @@ func TestJobEventBus_EventIsolation_HandlersNotCrossCalled(t *testing.T) {
 		Timestamp: time.Now(),
 	})
 
-	// Wait for handlers
-	time.Sleep(20 * time.Millisecond)
-
 	// Assert - only the correct handler should be called
-	assert.True(t, completedCalled, "JobCompleted handler should be called")
-	assert.False(t, failedCalled, "JobFailed handler should NOT be called")
-	assert.False(t, cancelledCalled, "JobCancelled handler should NOT be called")
+	select {
+	case <-completedDone:
+		// Expected - JobCompleted handler was called
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("JobCompleted handler was not called within timeout")
+	}
+
+	// Verify other handlers were NOT called
+	select {
+	case <-failedDone:
+		t.Fatal("JobFailed handler should NOT have been called")
+	case <-cancelledDone:
+		t.Fatal("JobCancelled handler should NOT have been called")
+	case <-time.After(50 * time.Millisecond):
+		// Expected - other handlers were not called
+	}
 }

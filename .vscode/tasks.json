@@ -1,0 +1,153 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup Mage (one-time)",
+      "type": "shell", 
+      "command": "go", 
+      "args": ["install", "github.com/magefile/mage@latest"],
+      "detail": "Install Mage build tool"
+    },
+
+    // ---- Setup & Dependencies ----
+    { 
+      "label": "Mage: Bootstrap", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["bootstrap"],
+      "detail": "Complete project setup (deps + gen)"
+    },
+    { 
+      "label": "Mage: Deps", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["deps"],
+      "detail": "Install CLI build tools"
+    },
+    { 
+      "label": "Mage: ModDownload", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["moddownload"],
+      "detail": "Download Go module dependencies"
+    },
+
+    // ---- Code Generation ----
+    { 
+      "label": "Mage: Gen", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["gen"],
+      "detail": "Run code generators (sqlc, templ)"
+    },
+
+    // ---- Build & Run ----
+    {
+      "label": "Mage: Build",
+      "type": "shell",
+      "command": "mage",
+      "args": ["build"],
+      "problemMatcher": ["$go"],
+      "group": { "kind": "build", "isDefault": true },
+      "options": { "env": { "SKIP_GEN": "" } },
+      "detail": "Build binary to ./bin"
+    },
+    {
+      "label": "Mage: Run",
+      "type": "shell",
+      "command": "mage",
+      "args": ["run"],
+      "problemMatcher": ["$go"],
+      "detail": "Run from source"
+    },
+    {
+      "label": "Mage: Debug",
+      "type": "shell",
+      "command": "mage",
+      "args": ["debug"],
+      "detail": "Start delve debugger (headless :2345)"
+    },
+
+    // ---- Testing & Quality ----
+    { 
+      "label": "Mage: Test", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["test"], 
+      "problemMatcher": ["$go"], 
+      "group": { "kind": "test", "isDefault": true },
+      "detail": "Run tests with race detection"
+    },
+    { 
+      "label": "Mage: Cover", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["cover"],
+      "detail": "Generate test coverage HTML report"
+    },
+    { 
+      "label": "Mage: Vuln", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["vuln"],
+      "detail": "Check for security vulnerabilities"
+    },
+
+    // ---- Linting & Formatting ----
+    { 
+      "label": "Mage: Lint", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["lint"], 
+      "problemMatcher": ["$go"],
+      "detail": "Run all linters (vet, staticcheck, golangci-lint)"
+    },
+    { 
+      "label": "Mage: Fmt", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["fmt"],
+      "detail": "Format code (gofmt + goimports)"
+    },
+    { 
+      "label": "Mage: FmtCheck", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["fmtcheck"],
+      "detail": "Check if formatting is needed"
+    },
+
+    // ---- Verification ----
+    { 
+      "label": "Mage: Verify", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["verify"], 
+      "problemMatcher": ["$go"],
+      "detail": "Full CI pipeline (fmt, lint, vuln, build, test)"
+    },
+    { 
+      "label": "Mage: TidyCheck", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["tidycheck"],
+      "detail": "Verify go.mod/go.sum are tidy"
+    },
+    { 
+      "label": "Mage: GenerateCheck", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["generatecheck"],
+      "detail": "Verify generated code is up-to-date"
+    },
+
+    // ---- Utilities ----
+    { 
+      "label": "Mage: Clean", 
+      "type": "shell", 
+      "command": "mage", 
+      "args": ["clean"],
+      "detail": "Remove build artifacts and generated files"
+    }
+  ]
+}

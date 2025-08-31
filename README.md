@@ -193,17 +193,28 @@ openssl pkcs12 -in cert.pfx -noout
 
 ### Building
 ```bash
-# Generate database queries
-sqlc generate
-
-# Generate HTML templates  
-templ generate
+# Bootstrap development environment (installs tools and runs generators)
+mage bootstrap
 
 # Build server
-go build ./cmd/server
+mage build
 
 # Run tests
-go test ./...
+mage test
+
+# Run all checks (formatting, linting, tests, build)
+mage verify
+```
+
+#### Manual Commands
+```bash
+# Generate database queries and templates
+mage gen
+
+# Run specific tasks
+mage lint        # Run linters
+mage cover       # Generate coverage report
+mage vuln        # Check for vulnerabilities
 ```
 
 ### Project Structure

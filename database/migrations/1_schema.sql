@@ -1,7 +1,3 @@
--- Complete SharePoint Audit Database Schema
--- Consolidated from all migrations for fresh database installation
--- Version: 5 (includes all features through migration 0005)
-
 PRAGMA foreign_keys = ON;
 
 -- ======================
@@ -130,7 +126,7 @@ CREATE TABLE sharing_links (
   total_members_count           INTEGER DEFAULT 0,
   audited_at                    DATETIME DEFAULT CURRENT_TIMESTAMP,
   
-  -- Governance fields from migration 0003
+  -- Governance fields
   expiration                    DATETIME,
   password_last_modified        DATETIME,
   password_last_modified_by_principal_id INTEGER,
@@ -186,10 +182,10 @@ CREATE TABLE sharing_link_invitations (
 );
 
 -- ====================
--- Governance tables (from migration 0003)
+-- Governance tables
 -- ====================
 
--- Sensitivity labeling information (enhanced from migration 0004)
+-- Sensitivity labeling information
 CREATE TABLE sensitivity_labels (
   site_id                              INTEGER NOT NULL REFERENCES sites(site_id),
   item_guid                           TEXT NOT NULL,
@@ -200,7 +196,6 @@ CREATE TABLE sensitivity_labels (
   has_irm_protection                  BOOLEAN DEFAULT FALSE,
   sensitivity_label_protection_type   TEXT,
   
-  -- Enhanced fields from migration 0004
   label_id                            TEXT, -- vti_x005f_iplabelid
   owner_email                         TEXT, -- vti_x005f_iplabelowneremail
   set_date                            DATETIME, -- MSIP_x005f_Label_x005f_..._x005f_SetDate
@@ -235,7 +230,7 @@ CREATE TABLE sharing_governance (
   updated_at                                      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Sharing abilities matrix (stored as JSON for flexibility)
+-- Sharing abilities matrix
 CREATE TABLE sharing_abilities (
   site_id                      INTEGER PRIMARY KEY REFERENCES sites(site_id),
   can_stop_sharing             BOOLEAN DEFAULT FALSE,
@@ -248,7 +243,7 @@ CREATE TABLE sharing_abilities (
   updated_at                   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Recipient limits (stored as JSON for flexibility)
+-- Recipient limits
 CREATE TABLE recipient_limits (
   site_id                       INTEGER PRIMARY KEY REFERENCES sites(site_id),
   check_permissions             TEXT, -- JSON: RecipientLimitsInfo
@@ -260,7 +255,7 @@ CREATE TABLE recipient_limits (
 );
 
 -- ====================
--- Jobs table (enhanced from migration 0002)
+-- Jobs table
 -- ====================
 
 CREATE TABLE jobs (
@@ -284,7 +279,7 @@ CREATE TABLE jobs (
 );
 
 -- ====================
--- Audit Runs table (from migration 0005)
+-- Audit Runs table
 -- ====================
 
 CREATE TABLE audit_runs (
@@ -379,14 +374,14 @@ CREATE INDEX idx_sharing_links_item ON sharing_links(site_id, item_guid) WHERE i
 CREATE INDEX idx_sharing_links_file_folder ON sharing_links(site_id, file_folder_unique_id) WHERE file_folder_unique_id IS NOT NULL;
 CREATE INDEX idx_sharing_links_audit_run ON sharing_links(audit_run_id);
 
--- Enhanced governance indexes (from migration 0003)
+-- Governance indexes
 CREATE INDEX idx_sharing_links_expiration ON sharing_links(site_id, expiration) WHERE expiration IS NOT NULL;
 CREATE INDEX idx_sharing_links_external_guests ON sharing_links(site_id, has_external_guest_invitees) WHERE has_external_guest_invitees = TRUE;
 CREATE INDEX idx_sharing_links_anonymous ON sharing_links(site_id, allows_anonymous_access) WHERE allows_anonymous_access = TRUE;
 CREATE INDEX idx_sharing_links_unhealthy ON sharing_links(site_id, is_unhealthy) WHERE is_unhealthy = TRUE;
 CREATE INDEX idx_sharing_links_password_protected ON sharing_links(site_id, requires_password) WHERE requires_password = TRUE;
 
--- Sensitivity label indexes (enhanced from migration 0004)
+-- Sensitivity label indexes
 CREATE INDEX idx_sensitivity_labels_site_id ON sensitivity_labels(site_id);
 CREATE INDEX idx_sensitivity_labels_label_id ON sensitivity_labels(site_id, label_id);
 CREATE INDEX idx_sensitivity_labels_owner ON sensitivity_labels(site_id, owner_email) WHERE owner_email IS NOT NULL;

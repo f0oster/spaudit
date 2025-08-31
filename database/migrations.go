@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -14,9 +15,21 @@ var migrationFiles embed.FS
 
 // Migration represents a database migration
 type Migration struct {
-	Version string
+	Version int64
 	Name    string
 	SQL     string
+}
+
+// hasDuplicateVersions checks the provided migrations for version collision
+func hasDuplicateVersions(migrations []Migration) (bool, int64, string, string) {
+	seen := make(map[int64]string, len(migrations))
+	for _, m := range migrations {
+		if prev, ok := seen[m.Version]; ok {
+			return true, m.Version, prev, m.Name
+		}
+		seen[m.Version] = m.Name
+	}
+	return false, 0, "", ""
 }
 
 // getMigrations returns all available migrations sorted by version
@@ -28,33 +41,47 @@ func getMigrations() ([]Migration, error) {
 
 	var migrations []Migration
 	for _, entry := range entries {
+
+		// Detect non-migration files
 		if !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
+			// We only embed migrations/*.sql, but just incase...
+			return nil, fmt.Errorf("non-migration file found in migrations path: %s", entry.Name())
+		}
+
+		// Detect malformed migration files
+		if !strings.Contains(entry.Name(), "_") {
+			// A migration file without '_' delimiter has no index
+			return nil, fmt.Errorf("malformed migration filename: %s", entry.Name())
+		}
+
+		// Extract version from filename (e.g., "1_init.sql" -> "1")
+		name := strings.TrimSuffix(entry.Name(), ".sql")
+		parts := strings.SplitN(name, "_", 2)
+
+		version, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse version from schema file (%s): %v", entry.Name(), err)
 		}
 
 		content, err := migrationFiles.ReadFile("migrations/" + entry.Name())
 		if err != nil {
-			return nil, fmt.Errorf("failed to read migration file %s: %w", entry.Name(), err)
-		}
-
-		// Extract version from filename (e.g., "0001_init.sql" -> "0001")
-		name := strings.TrimSuffix(entry.Name(), ".sql")
-		parts := strings.SplitN(name, "_", 2)
-		if len(parts) < 1 {
-			continue
+			return nil, fmt.Errorf("failed to read migration file %s: %v", entry.Name(), err)
 		}
 
 		migrations = append(migrations, Migration{
-			Version: parts[0],
+			Version: version,
 			Name:    name,
 			SQL:     string(content),
 		})
 	}
 
-	// Sort by version
 	sort.Slice(migrations, func(i, j int) bool {
 		return migrations[i].Version < migrations[j].Version
 	})
+
+	if hasDuplicate, collidingVersion, a, b := hasDuplicateVersions(migrations); hasDuplicate {
+		return nil, fmt.Errorf("duplicate migration version %d: %s and %s", collidingVersion, a, b)
+	}
 
 	return migrations, nil
 }
@@ -63,7 +90,7 @@ func getMigrations() ([]Migration, error) {
 func (d *Database) createMigrationsTable() error {
 	query := `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
-			version TEXT PRIMARY KEY,
+			version INT PRIMARY KEY,
 			name TEXT NOT NULL,
 			applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
@@ -77,8 +104,8 @@ func (d *Database) createMigrationsTable() error {
 }
 
 // getAppliedMigrations returns a set of applied migration versions
-func (d *Database) getAppliedMigrations() (map[string]bool, error) {
-	applied := make(map[string]bool)
+func (d *Database) getAppliedMigrations() (map[int64]bool, error) {
+	applied := make(map[int64]bool)
 
 	rows, err := d.readDB.Query("SELECT version FROM schema_migrations")
 	if err != nil {
@@ -87,7 +114,7 @@ func (d *Database) getAppliedMigrations() (map[string]bool, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var version string
+		var version int64
 		if err := rows.Scan(&version); err != nil {
 			return nil, fmt.Errorf("failed to scan migration version: %w", err)
 		}
@@ -103,7 +130,7 @@ func (d *Database) applyMigration(migration Migration) error {
 		"version", migration.Version,
 		"name", migration.Name)
 
-	// Start transaction (use write connection for schema changes)
+	// Start transaction
 	tx, err := d.writeDB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -182,7 +209,7 @@ func (d *Database) runMigrations() error {
 			"applied", appliedCount,
 			"total", len(migrations))
 	} else {
-		d.logger.Database("Database is up to date",
+		d.logger.Database("Database was already up to date",
 			"total_migrations", len(migrations))
 	}
 
@@ -191,18 +218,23 @@ func (d *Database) runMigrations() error {
 
 // checkDatabaseExists checks if the database file exists
 func checkDatabaseExists(path string) bool {
-	if path == ":memory:" {
-		return false // In-memory database always needs initialization
-	}
+	// TODO: we should bake in support for memory databases, would be useful for testing
+	/*
+		// Currently we don't deal with a DSN and instead take a file path from the defined config file
+		// Could do something like below
+			if path == ":memory:" {
+				return false // in memory database always needs initialization
+			}
 
-	// For file paths, check if file exists
-	if strings.HasPrefix(path, "file:") {
-		// Extract file path from DSN
-		path = strings.TrimPrefix(path, "file:")
-		if idx := strings.Index(path, "?"); idx != -1 {
-			path = path[:idx]
-		}
-	}
+			// For file paths
+			if strings.HasPrefix(path, "file:") {
+				// Extract file path from DSN
+				path = strings.TrimPrefix(path, "file:")
+				if idx := strings.Index(path, "?"); idx != -1 {
+					path = path[:idx]
+				}
+			}
+	*/
 
 	// Check if file exists and is not empty
 	if info, err := filepath.Abs(path); err == nil {

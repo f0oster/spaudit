@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"spaudit/gen/db"
 	"spaudit/logging"
+
+	_ "modernc.org/sqlite"
 )
 
 // Config holds database configuration
@@ -223,6 +224,13 @@ func (d *Database) WriteDB() *sql.DB {
 // Close closes both database connections
 func (d *Database) Close() error {
 	d.logger.Database("Closing database connections")
+
+	if d.config.EnableWAL {
+		d.logger.Info("checkpointing WAL...")
+		if _, err := d.writeDB.Exec("PRAGMA wal_checkpoint(TRUNCATE);"); err != nil {
+			d.logger.Warn("failed to checkpoint WAL", "error", err)
+		}
+	}
 
 	var errs []error
 	if err := d.readDB.Close(); err != nil {

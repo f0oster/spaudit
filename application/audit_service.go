@@ -98,8 +98,7 @@ func (s *AuditServiceImpl) BuildAuditParametersFromFormData(formData map[string]
 
 	if hasFormValue("skip_hidden") {
 		parameters.SkipHidden = true
-	} else {
-		// If checkbox not present in form, user unchecked it
+	} else if _, exists := formData["skip_hidden"]; exists {
 		parameters.SkipHidden = false
 	}
 

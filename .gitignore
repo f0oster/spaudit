@@ -1,30 +1,23 @@
-# Binaries for programs and plugins
+# --- Go / build artifacts
+bin/
+dist/
+build/
+__debug_bin*
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Test binary, built with `go test -c`
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
-go.work
-
-# IDE files
-.vscode/
+# --- IDE / editor
 .idea/
 *.swp
 *.swo
 *~
 
-# OS generated files
+# --- OS noise
 .DS_Store
 .DS_Store?
 ._*
@@ -33,7 +26,7 @@ go.work
 ehthumbs.db
 Thumbs.db
 
-# Database files
+# --- Excluse Database files
 *.db
 *.sq3
 *.sq3-shm
@@ -41,45 +34,43 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
-# Certificate files
+# --- Exclude Certificates/Env/Secrets
 *.pfx
 *.p12
 *.crt
 *.key
 *.pem
-
-# Environment files
 .env
 .env.local
 .env.development
 .env.test
 .env.production
 
-# Log files
+# --- Exclude logs / temp
 *.log
 logs/
-
-# Temporary files
 tmp/
 temp/
 *.tmp
 
-# Build artifacts
-dist/
-build/
-__debug_bin*
+# --- Exclude .json files unless explicitly included
+*.json
 
-# SharePoint specific
-sp_config.json
-auth_config.json
+# --- Exclude Hidden folders (dot-dirs) except ones we want tracked
+.*/
 
-# Claude AI files
-.claude
-claude_*
-*claude*
+# --- Explicitly allow these hidden folders / files
+!.gitattributes
+!.gitignore
+!.github/
+!.devcontainer/
 
+# --- Project Tasks
+!.vscode/
+!.vscode/tasks.json
+!.vscode/launch.json       
+
+# --- Exclude .md files unless explicitly included
 *.md
 !README.md
-!readme.md
-!README.MD
-!docs/ARCHITECTURE.md
+!docs/**/*.md

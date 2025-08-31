@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -27,14 +28,20 @@ type SSEManager struct {
 	mu             sync.RWMutex
 	logger         *logging.Logger
 	toastPresenter *presenters.ToastPresenter
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 // NewSSEManager creates a new SSE connection manager with cleanup routines.
-func NewSSEManager() *SSEManager {
+func NewSSEManager(appCtx context.Context) *SSEManager {
+	ctx, cancel := context.WithCancel(appCtx)
+	
 	manager := &SSEManager{
 		clients:        make(map[string]*SSEClient),
 		logger:         logging.Default().WithComponent("sse_manager"),
 		toastPresenter: presenters.NewToastPresenter(),
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 
 	// Start cleanup routine for stale connections
@@ -100,6 +107,28 @@ func (s *SSEManager) RemoveClient(clientID string) {
 			close(client.done)
 		}
 		s.logger.Info("SSE client disconnected", "client_id", clientID)
+	}
+}
+
+// CloseAll closes all SSE connections and shuts down the manager
+func (s *SSEManager) CloseAll() {
+	s.logger.Info("Closing all SSE connections")
+	s.cancel()
+}
+
+// closeAllConnections removes all active connections (called during shutdown)
+func (s *SSEManager) closeAllConnections() {
+	s.mu.Lock()
+	clientIDs := make([]string, 0, len(s.clients))
+	for clientID := range s.clients {
+		clientIDs = append(clientIDs, clientID)
+	}
+	s.mu.Unlock()
+
+	s.logger.Info("Closing SSE connections", "count", len(clientIDs))
+	
+	for _, clientID := range clientIDs {
+		s.RemoveClient(clientID)
 	}
 }
 
@@ -391,24 +420,31 @@ func (s *SSEManager) cleanupRoutine() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		s.SendKeepAlive()
+	for {
+		select {
+		case <-s.ctx.Done():
+			s.logger.Info("SSE cleanup routine shutting down")
+			s.closeAllConnections()
+			return
+		case <-ticker.C:
+			s.SendKeepAlive()
 
-		// Remove clients that haven't received messages in a while
-		s.mu.Lock()
-		staleThreshold := time.Now().Add(-2 * time.Minute)
-		staleClients := []string{}
-		for clientID, client := range s.clients {
-			if client.lastSent.Before(staleThreshold) {
-				s.logger.Info("Removing stale SSE client", "client_id", clientID)
-				staleClients = append(staleClients, clientID)
+			// Remove clients that haven't received messages in a while
+			s.mu.Lock()
+			staleThreshold := time.Now().Add(-2 * time.Minute)
+			staleClients := []string{}
+			for clientID, client := range s.clients {
+				if client.lastSent.Before(staleThreshold) {
+					s.logger.Info("Removing stale SSE client", "client_id", clientID)
+					staleClients = append(staleClients, clientID)
+				}
 			}
-		}
-		s.mu.Unlock()
+			s.mu.Unlock()
 
-		// Remove stale clients outside of lock
-		for _, clientID := range staleClients {
-			s.RemoveClient(clientID)
+			// Remove stale clients outside of lock
+			for _, clientID := range staleClients {
+				s.RemoveClient(clientID)
+			}
 		}
 	}
 }

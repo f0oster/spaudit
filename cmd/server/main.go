@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io/fs"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -28,6 +32,10 @@ import (
 )
 
 func main() {
+	// Create app-wide context for graceful shutdown
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
+
 	// Initialize configuration
 	loadEnvironment()
 	cfg := config.LoadAppConfigFromEnv()
@@ -39,12 +47,12 @@ func main() {
 	db := initializeDatabase(cfg, logger)
 	defer db.Close()
 
-	// Build dependencies
-	deps := buildDependencies(db, logger)
+	// Build dependencies with app context
+	deps := buildDependencies(appCtx, db, logger)
 
 	// Setup routes and start server
 	router := setupRoutes(deps, cfg)
-	startServer(router, cfg.HTTPAddr, logger)
+	startServer(router, cfg.HTTPAddr, logger, deps, appCancel)
 }
 
 // ApplicationServices groups all business logic services
@@ -183,7 +191,7 @@ func buildRepositories(database *database.Database) *RepositoryBundle {
 }
 
 // buildApplicationServices creates all business logic services with proper dependency injection
-func buildApplicationServices(db *database.Database, repos *RepositoryBundle) *ApplicationServices {
+func buildApplicationServices(appCtx context.Context, db *database.Database, repos *RepositoryBundle) *ApplicationServices {
 	// Create event bus for job events
 	eventBus := events.NewJobEventBus()
 
@@ -198,6 +206,7 @@ func buildApplicationServices(db *database.Database, repos *RepositoryBundle) *A
 	registry.RegisterExecutor(jobsdom.JobTypeSiteAudit, siteAuditExecutor)
 
 	// Create job service
+	// TODO: Pass appCtx to JobService for graceful job cancellation
 	jobService := application.NewJobService(repos.JobRepo, repos.AuditRepo, registry, nil, eventBus)
 	auditService := application.NewAuditService(jobService, db)
 
@@ -221,7 +230,7 @@ func buildApplicationServices(db *database.Database, repos *RepositoryBundle) *A
 }
 
 // buildPresentationLayer creates all presenters and handlers
-func buildPresentationLayer(services *ApplicationServices) *PresentationLayer {
+func buildPresentationLayer(appCtx context.Context, services *ApplicationServices) *PresentationLayer {
 	// Build presenters (view logic)
 	auditPresenter := presenters.NewAuditPresenter()
 	jobPresenter := presenters.NewJobPresenter()
@@ -230,7 +239,7 @@ func buildPresentationLayer(services *ApplicationServices) *PresentationLayer {
 	sitePresenter := presenters.NewSitePresenter()
 
 	// Build handlers - orchestrate services & presenters
-	sseManager := handlers.NewSSEManager()
+	sseManager := handlers.NewSSEManager(appCtx)
 	listHandlers := handlers.NewListHandlers(
 		services.SiteContentService,
 		services.PermissionService,
@@ -263,13 +272,13 @@ func buildPresentationLayer(services *ApplicationServices) *PresentationLayer {
 }
 
 // buildDependencies orchestrates the creation of all application dependencies
-func buildDependencies(db *database.Database, logger *logging.Logger) *Dependencies {
+func buildDependencies(appCtx context.Context, db *database.Database, logger *logging.Logger) *Dependencies {
 	queries := db.Queries()
 
 	// Build each layer
 	repos := buildRepositories(db)
-	services := buildApplicationServices(db, repos)
-	presentation := buildPresentationLayer(services)
+	services := buildApplicationServices(appCtx, db, repos)
+	presentation := buildPresentationLayer(appCtx, services)
 
 	return &Dependencies{
 		DB:           db,
@@ -392,12 +401,53 @@ func setupAuditRoutes(r *chi.Mux, deps *Dependencies) {
 	r.Post("/jobs/{jobID}/cancel", deps.Presentation.JobHandlers.CancelJob)
 }
 
-func startServer(router *chi.Mux, addr string, logger *logging.Logger) {
+func startServer(router *chi.Mux, addr string, logger *logging.Logger, deps *Dependencies, appCancel context.CancelFunc) {
+	server := &http.Server{Addr: addr, Handler: router}
+
+	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func() {
+		<-sig
+		logger.Info("Shutdown signal received")
+
+		// Cancel app-wide context first to signal all services to shutdown
+		logger.Info("Cancelling app context...")
+		appCancel()
+
+		// Close SSE connections immediately
+		logger.Info("Closing SSE connections...")
+		deps.Presentation.SSEManager.CloseAll()
+
+		shutdownCtx, cancel := context.WithTimeout(serverCtx, 30*time.Second)
+		defer cancel()
+
+		go func() {
+			<-shutdownCtx.Done()
+			if shutdownCtx.Err() == context.DeadlineExceeded {
+				logger.Error("Graceful shutdown timed out, forcing exit")
+				os.Exit(1)
+			}
+		}()
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Error("Server shutdown error", "error", err)
+			os.Exit(1)
+		}
+		serverStopCtx()
+	}()
+
 	logger.Info("Server starting", "address", addr)
-	if err := http.ListenAndServe(addr, router); err != nil {
-		logger.Error("Server failed", "error", err, "address", addr)
+	err := server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		logger.Error("Server failed", "error", err)
 		os.Exit(1)
 	}
+
+	<-serverCtx.Done()
+	logger.Info("Server stopped")
 }
 
 // setupEventHandlers wires up the event handlers for job notifications

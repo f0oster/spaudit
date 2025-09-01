@@ -1,6 +1,6 @@
 # SharePoint Audit Tool - Architecture Documentation
 
-This document provides detailed technical architecture information for developers who need to understand the internal design and implementation patterns.
+This document describes the target technical architecture and implementation patterns. Components described may represent the intended design rather than current implementation state.
 
 ## Table of Contents
 - [Architecture Principles](#architecture-principles)
@@ -13,11 +13,11 @@ This document provides detailed technical architecture information for developer
 
 ## Architecture Principles
 
-The project follows Clean Architecture patterns with strict dependency inversion:
+The project uses layered architecture with dependency inversion:
 
 ### Core Principles
 - **Dependency Direction**: All dependencies point inward toward the domain
-- **Business Logic Isolation**: Pure business logic with no external dependencies
+- **Business Logic Isolation**: Domain code has no external dependencies
 - **Interface Segregation**: Repository interfaces define clear contracts
 - **Composition over Inheritance**: Services compose repositories rather than inherit
 
@@ -108,32 +108,32 @@ type SiteRepository interface {
 
 ### Application Layer (`application/`)
 
-Business logic orchestration services that compose repositories.
+Services that compose repositories for use cases.
 
 ```go
 // application/site_content_service.go
 type SiteContentService struct {
-    siteRepo       contracts.SiteRepository
-    listRepo       contracts.ListRepository
-    itemRepo       contracts.ItemRepository
-    jobRepo        contracts.JobRepository
+    contentAggregate contracts.SiteContentAggregateRepository
+    auditRunID       int64 // For audit-scoped operations
 }
 
 func (s *SiteContentService) GetSiteWithLists(ctx context.Context, siteID int64) (*SiteWithListsData, error) {
-    // 1. Compose data from multiple repositories
-    site, err := s.siteRepo.GetByID(ctx, siteID)
-    lists, err := s.listRepo.GetAllForSite(ctx, siteID)
-    lastAuditDate, err := s.jobRepo.GetLastAuditDate(ctx, siteID)
+    // 1. Get site with metadata from aggregate repository
+    siteWithMeta, err := s.contentAggregate.GetSiteWithMetadata(ctx, siteID)
     
-    // 2. Apply business calculations
-    return s.calculateBusinessMetrics(site, lists, lastAuditDate), nil
+    // 2. Get lists for the site (automatically audit-run filtered)
+    lists, err := s.contentAggregate.GetListsForSite(ctx, siteID)
+    
+    // 3. Apply business calculations
+    return s.calculateBusinessMetrics(siteWithMeta, lists), nil
 }
 ```
 
 ### Infrastructure Layer (`infrastructure/`)
 
-External system implementations that fulfill domain contracts.
+Implementations that fulfill domain contracts.
 
+#### Individual Repository Pattern
 ```go
 // infrastructure/repositories/sqlc_site_repository.go
 type SqlcSiteRepository struct {
@@ -154,29 +154,68 @@ func (r *SqlcSiteRepository) GetByID(ctx context.Context, siteID int64) (*sharep
 }
 ```
 
-### Interface Layer (`interfaces/web/`)
-
-HTTP communication with clean separation of concerns.
+#### Aggregate Repository Pattern
+Combines multiple repository operations for complex use cases:
 
 ```go
-// interfaces/web/handlers/site_handlers.go
-type SiteHandlers struct {
-    siteContentService *application.SiteContentService
-    sitePresenter      *presenters.SitePresenter
+// infrastructure/repositories/site_content_aggregate_repository.go
+type SiteContentAggregateRepository struct {
+    siteRepo         contracts.SiteRepository
+    listRepo         contracts.ListRepository
+    permissionRepo   contracts.PermissionRepository
+    auditRepo        contracts.AuditRepository
+    auditRunID       int64 // Scoping to specific audit run
 }
 
-func (h *SiteHandlers) GetSiteWithLists(w http.ResponseWriter, r *http.Request) {
-    // 1. Extract HTTP parameters
+func (r *SiteContentAggregateRepository) GetSiteWithMetadata(ctx context.Context, siteID int64) (*SiteWithMetadata, error) {
+    // 1. Get site entity
+    site, err := r.siteRepo.GetByID(ctx, siteID)
+    
+    // 2. Get audit metadata for this audit run
+    auditRun, err := r.auditRepo.GetAuditRun(ctx, r.auditRunID)
+    
+    // 3. Calculate business metrics across repositories
+    return &SiteWithMetadata{
+        Site:            site,
+        LastAuditDate:   auditRun.StartedAt,
+        LastAuditDaysAgo: int(time.Since(auditRun.StartedAt).Hours() / 24),
+        AuditRunID:      r.auditRunID,
+    }, nil
+}
+
+func (r *SiteContentAggregateRepository) GetListsForSite(ctx context.Context, siteID int64) ([]*ListSummary, error) {
+    // Automatically filtered to audit run scope
+    return r.listRepo.GetListsSummarizedBySiteAndAuditRun(ctx, siteID, r.auditRunID)
+}
+```
+
+### Interface Layer (`interfaces/web/`)
+
+HTTP handling with separated concerns.
+
+```go
+// interfaces/web/handlers/list_handlers.go
+type ListHandlers struct {
+    serviceFactory application.AuditRunScopedServiceFactory
+    listPresenter  *presenters.ListPresenter
+}
+
+func (h *ListHandlers) SiteListsPage(w http.ResponseWriter, r *http.Request) {
+    // 1. Extract HTTP parameters including audit run ID
     siteID := extractSiteID(r)
+    auditRunID := extractAuditRunID(r) // "latest" or specific ID
 
-    // 2. Call application service (business logic)
-    data, err := h.siteContentService.GetSiteWithLists(r.Context(), siteID)
+    // 2. Create audit-run-scoped services
+    scopedServices, err := h.serviceFactory.CreateForAuditRun(r.Context(), siteID, auditRunID)
 
-    // 3. Transform to view model (presentation logic)
-    viewModel := h.sitePresenter.ToSiteListsViewModel(data)
+    // 3. Get data (automatically filtered to audit run)
+    data, err := scopedServices.SiteContentService.GetSiteWithLists(r.Context(), siteID)
 
-    // 4. Render response
-    templates.SiteListsView(viewModel).Render(r.Context(), w)
+    // 4. Transform to view model
+    viewModel := h.listPresenter.ToSiteListsViewModel(data)
+
+    // 5. Render response
+    templates.SiteListsPage(*viewModel).Render(r.Context(), w)
 }
 ```
 
@@ -222,19 +261,19 @@ infrastructure/repositories/ (Data persistence with audit run tracking)
 
 ## Job System Architecture
 
-The job system provides robust background processing for long-running SharePoint audits.
+The job system handles background processing for SharePoint audits.
 
-### Core Design Principles
-- **Single Responsibility**: Each component has a focused role in the job lifecycle
-- **Event-Driven**: Domain events decouple job execution from UI updates
-- **Linear Execution**: Simplified flow eliminates complex callback chains
-- **Context Cancellation**: Proper goroutine cleanup and responsive termination
+### Design Principles
+- **Single Responsibility**: Each component handles one job lifecycle concern
+- **Event-Driven**: Domain events separate job execution from UI updates
+- **Linear Execution**: Sequential flow without complex callbacks
+- **Context Cancellation**: Goroutine cleanup and termination support
 
 ### Job System Components
 
 #### 1. Job Service (`application/job_service_impl.go`)
 
-Central orchestrator with context cancellation support.
+Manages job lifecycle with context cancellation.
 
 ```go
 type JobServiceImpl struct {
@@ -259,7 +298,7 @@ type JobServiceImpl struct {
 
 #### 2. Job Executors (`platform/executors/`)
 
-Type-specific execution engines implementing the `JobExecutor` interface.
+Job executors implementing the `JobExecutor` interface.
 
 ```go
 type JobExecutor interface {
@@ -274,7 +313,7 @@ type SiteAuditExecutor struct {
 
 #### 3. Event Bus (`platform/events/job_event_bus.go`)
 
-Type-safe event publishing and subscription with panic recovery.
+Event publishing and subscription with panic recovery.
 
 ```go
 type JobEventBus struct {
@@ -342,33 +381,123 @@ type JobState struct {
 // - Context cancellation support
 ```
 
+## Audit Run Scoping Architecture
+
+The application implements audit run scoping for historical data access and isolation:
+
+### AuditRunScopedServiceFactory
+
+Creates services automatically filtered to specific audit runs.
+
+```go
+// application/audit_run_scoped_service_factory.go
+type AuditRunScopedServiceFactory interface {
+    CreateForAuditRun(ctx context.Context, siteID int64, auditRunIDStr string) (*AuditRunScopedServices, error)
+}
+
+type AuditRunScopedServices struct {
+    SiteContentService  *SiteContentService
+    PermissionService   *PermissionService
+    SiteBrowsingService *SiteBrowsingService
+    AuditRunID          int64
+}
+```
+
+**Key Features:**
+- **"Latest" Resolution**: Converts "latest" string to actual audit run ID
+- **Automatic Filtering**: All repository operations scoped to specific audit run
+- **Historical Access**: Compare data across different audit runs
+- **Data Isolation**: Prevents cross-audit data contamination
+
+### Scoped vs Unscoped Services
+
+```go
+// Unscoped - operates on all data
+siteService := application.NewSiteContentService(aggregateRepo)
+
+// Scoped - operates only on specific audit run data
+scopedServices, err := serviceFactory.CreateForAuditRun(ctx, siteID, "latest")
+siteData, err := scopedServices.SiteContentService.GetSiteWithLists(ctx, siteID)
+```
+
+### Handler Integration
+
+```go
+// interfaces/web/handlers/list_handlers.go
+func (h *ListHandlers) SiteListsPage(w http.ResponseWriter, r *http.Request) {
+    siteID := extractSiteID(r)
+    auditRunID := extractAuditRunID(r) // "latest" or specific ID
+    
+    // Create audit-run-scoped services
+    scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunID)
+    
+    // All operations automatically scoped to audit run
+    data, err := scopedServices.SiteContentService.GetSiteWithLists(ctx, siteID)
+}
+```
+
 ## Component Architecture
 
 ### Domain Services
 
 Pure business logic with no external dependencies.
 
+#### Content Analysis Service
+Categorizes SharePoint content by file type and calculates risk metrics:
+
 ```go
 // domain/sharepoint/content_service.go
-type ContentService struct{}
+type ContentService struct {
+    sensitiveExtensions  []string // .key, .pem, .config, etc.
+    documentExtensions   []string // .docx, .pdf, .txt, etc.
+    executableExtensions []string // .exe, .msi, .bat, etc.
+}
 
 func (s *ContentService) AnalyzeItems(items []*Item) *ContentAnalysis {
     analysis := &ContentAnalysis{
-        TotalItems:      len(items),
-        ItemsWithUnique: 0,
-        FileTypes:       make(map[string]int),
+        TotalItems:       int64(len(items)),
+        FilesByExtension: make(map[string]int64),
     }
     
     for _, item := range items {
         if item.HasUnique {
             analysis.ItemsWithUnique++
         }
-        analysis.FileTypes[item.FileExtension]++
+        
+        if item.IsDocument() {
+            analysis.FilesCount++
+            s.analyzeFile(item, analysis)
+        } else if item.IsDirectory() {
+            analysis.FoldersCount++
+        }
     }
+    
+    // Business calculations
+    analysis.MostCommonTypes = s.getMostCommonFileTypes(analysis.FilesByExtension)
     
     return analysis
 }
+
+func (s *ContentService) AssessContentRisk(analysis *ContentAnalysis) *ContentRiskAssessment {
+    riskScore := s.calculateContentRiskScore(analysis)
+    riskFactors := s.identifyContentRiskFactors(analysis)
+    
+    return &ContentRiskAssessment{
+        RiskScore:            riskScore,
+        RiskLevel:            s.determineContentRiskLevel(riskScore),
+        RiskFactors:          riskFactors,
+        Recommendations:      s.generateContentRecommendations(analysis),
+        SensitiveFilesCount:  s.countSensitiveFiles(analysis.FilesByExtension),
+        ExecutableFilesCount: s.countExecutableFiles(analysis.FilesByExtension),
+    }
+}
 ```
+
+#### Implementation Details
+- **File Type Categorization**: Maps extensions to categories (document, image, archive, executable, sensitive)
+- **Risk Scoring**: Calculates 0-100 score using item counts and file type distribution
+- **Recommendation Generation**: Returns string arrays based on threshold checks
+- **Extension Matching**: Uses string slices to match file extensions against predefined lists
 
 ### Repository Pattern with Base Repository
 
@@ -413,7 +542,7 @@ func (p *SitePresenter) ToSiteListsViewModel(data *application.SiteWithListsData
 
 ### Audit Run Tracking & Historical Data
 
-The application implements comprehensive audit run tracking for historical data preservation:
+The application implements audit run tracking for historical data:
 
 ```sql
 -- Each audit run gets unique tracking
@@ -425,25 +554,50 @@ CREATE TABLE audit_runs (
     site_url TEXT NOT NULL
 );
 
--- All entities tagged with audit_run_id for historical preservation
+-- Sites table (simplified, not audit-run scoped)
 CREATE TABLE sites (
-    site_id INTEGER NOT NULL,
-    site_url TEXT NOT NULL,
+    site_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    site_url TEXT NOT NULL UNIQUE,
     title TEXT,
-    audit_run_id INTEGER REFERENCES audit_runs(audit_run_id),
-    PRIMARY KEY (site_id, audit_run_id)
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lists are audit-run scoped for historical tracking
+CREATE TABLE lists (
+    list_id TEXT NOT NULL,
+    site_id INTEGER NOT NULL REFERENCES sites(site_id),
+    title TEXT NOT NULL,
+    item_count INTEGER NOT NULL DEFAULT 0,
+    is_document_library BOOLEAN NOT NULL DEFAULT FALSE,
+    audit_run_id INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (list_id, site_id, audit_run_id)
+);
+
+-- Items are audit-run scoped
+CREATE TABLE items (
+    item_id TEXT NOT NULL,
+    list_id TEXT NOT NULL,
+    site_id INTEGER NOT NULL REFERENCES sites(site_id),
+    name TEXT,
+    url TEXT,
+    has_unique_permissions BOOLEAN NOT NULL DEFAULT FALSE,
+    audit_run_id INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (item_id, list_id, site_id, audit_run_id)
 );
 ```
 
-**Key Benefits:**
-- **Historical Analysis**: Compare security posture changes over time
-- **Audit Trail**: Complete record of what was discovered when
-- **Performance Tracking**: Monitor audit execution efficiency
-- **Rollback Support**: Query previous audit states
+**Schema Characteristics:**
+- **Composite Keys**: Lists and items use (id, site_id, audit_run_id) primary keys
+- **Temporal Data**: All audit-scoped tables store created_at timestamps
+- **Foreign Key Constraints**: audit_run_id references audit_runs table
+- **Query Patterns**: Latest data accessed via ORDER BY audit_run_id DESC LIMIT 1
 
 ### SQLC Integration
 
-Type-safe database queries with SQLC code generation:
+Database queries using SQLC code generation:
 
 ```sql
 -- database/queries/sites.sql
@@ -583,45 +737,66 @@ All dependencies are wired in `cmd/server/main.go`:
 func main() {
     // Infrastructure layer
     db := database.New(dbPath)
+    spClient := infrastructure.NewSharePointClientFromEnv()
+    
+    // Individual repositories
     siteRepo := infrastructure.NewSqlcSiteRepository(db)
     listRepo := infrastructure.NewSqlcListRepository(db)
+    itemRepo := infrastructure.NewSqlcItemRepository(db)
+    auditRepo := infrastructure.NewSqlcAuditRepository(db)
+    jobRepo := infrastructure.NewSqlcJobRepository(db)
     
-    // Application layer
-    listService := application.NewListService(siteRepo, listRepo, jobRepo)
+    // Aggregate repositories (combining multiple repos)
+    siteContentAggregate := infrastructure.NewSiteContentAggregateRepository(
+        siteRepo, listRepo, itemRepo, auditRepo)
+    
+    // Application layer services
+    jobService := application.NewJobServiceImpl(jobRepo, auditRepo, executorRegistry, eventBus)
+    auditService := application.NewAuditService(auditRepo, siteRepo, jobService)
+    
+    // Audit-run-scoped service factory
+    serviceFactory := application.NewAuditRunScopedServiceFactory(
+        siteContentAggregate, auditRepo)
+    
+    // Platform layer
+    auditWorkflowFactory := platform.NewAuditWorkflowFactory(spClient, siteRepo, listRepo)
+    siteAuditExecutor := platform.NewSiteAuditExecutor(auditWorkflowFactory)
+    executorRegistry := platform.NewJobExecutorRegistry()
+    executorRegistry.Register("site_audit", siteAuditExecutor)
     
     // Interface layer
     listPresenter := presenters.NewListPresenter()
-    listHandlers := handlers.NewListHandlers(listService, listPresenter)
+    listHandlers := handlers.NewListHandlers(serviceFactory, listPresenter)
     
-    // Setup routes
-    router := setupRoutes(listHandlers)
+    // Setup routes and start server
+    router := setupRoutes(listHandlers, auditHandlers, jobHandlers)
     log.Fatal(http.ListenAndServe(":8080", router))
 }
 ```
 
-## Key Architectural Decisions
+## Architectural Decisions
 
-### Why Clean Architecture?
-- **Maintainability**: Clear layer boundaries with single responsibility
-- **Testability**: Fast unit tests without external dependencies
-- **Extensibility**: New interfaces (CLI, API) easily added
-- **Team Productivity**: Developers can work on layers independently
+### Layered Architecture
+- Clear layer boundaries with single responsibility
+- Fast unit tests without external dependencies
+- New interfaces easily added
+- Developers can work on layers independently
 
-### Why BaseRepository Pattern?
-- Eliminates adapter layer complexity while maintaining clean SQL type conversion
-- Shared utilities for common database operations
-- Maintains type safety without boilerplate
+### BaseRepository Pattern
+- Shared SQL type conversion utilities
+- Common database operations
+- Type safety without boilerplate
 
-### Why Event-Driven Job System?
-- **Decoupling**: Job execution independent of UI concerns
-- **Extensibility**: New notification types easily added via event handlers
-- **Resilience**: Event handler failures don't affect job execution
-- **Real-time**: UI updates happen immediately as events occur
+### Event-Driven Job System
+- Job execution separate from UI concerns
+- New notification types added via event handlers
+- Event handler failures don't affect job execution
+- UI updates happen as events occur
 
-### Why SQLC + SQLite?
-- **Type Safety**: Generated queries prevent runtime SQL errors
-- **Performance**: SQLite excellent for read-heavy audit data with WAL mode
-- **Simplicity**: No external database server required
-- **Flexibility**: Easy migration to PostgreSQL if needed
+### SQLC + SQLite
+- Generated queries prevent SQL errors
+- SQLite handles read-heavy audit data with WAL mode
+- No external database server needed
+- Migration to PostgreSQL supported
 
-This architecture provides a solid foundation for the SharePoint audit system while maintaining clean separation of concerns, comprehensive error handling, and excellent extensibility for future capabilities.
+This architecture supports the SharePoint audit system with separated concerns, error handling, and extensibility.

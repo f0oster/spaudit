@@ -164,16 +164,16 @@ func (s *SharePointDataCollector) CollectSiteData(ctx context.Context, auditRunI
 
 	// Step 6: Comprehensive sharing audit (if enabled)
 	if s.parameters.IncludeSharing {
-		s.progressReporter.ReportProgress(audit.StandardStages.Sharing, "Starting comprehensive sharing audit", 80)
-		s.logger.Audit("Starting comprehensive sharing audit", siteURL)
+		s.progressReporter.ReportProgress(audit.StandardStages.Sharing, "Starting sharing audit", 80)
+		s.logger.Audit("Starting sharing audit", siteURL)
 		sharingStart := s.metrics.StartTiming()
 		if err := s.sharingDataCollector.AuditSiteSharing(ctx, auditRunID, site.ID, siteURL); err != nil {
-			s.logger.AuditError("Comprehensive sharing audit failed", err, siteURL)
+			s.logger.AuditError("Sharing audit failed", err, siteURL)
 			s.metrics.RecordError()
 			// Don't fail the entire audit for sharing issues
 		} else {
-			s.logger.Audit("Completed comprehensive sharing audit", siteURL)
-			s.progressReporter.ReportProgress(audit.StandardStages.Sharing, "Comprehensive sharing audit complete", 90)
+			s.logger.Audit("Completed sharing audit", siteURL)
+			s.progressReporter.ReportProgress(audit.StandardStages.Sharing, "Sharing audit complete", 90)
 		}
 		s.metrics.RecordSharingAnalysis(sharingStart, 0) // TODO: Get actual sharing links count
 	}
@@ -183,7 +183,7 @@ func (s *SharePointDataCollector) CollectSiteData(ctx context.Context, auditRunI
 	return nil
 }
 
-// CollectSiteSharingData performs comprehensive sharing data collection by scanning for sharing links
+// CollectSiteSharingData collects site sharing data by scanning for sharing links.
 func (s *SharePointDataCollector) CollectSiteSharingData(ctx context.Context, auditRunID int64, siteID int64, siteURL string) error {
 	// Defensive checks
 	if s == nil {

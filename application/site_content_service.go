@@ -8,7 +8,7 @@ import (
 	"spaudit/domain/sharepoint"
 )
 
-// SiteWithListsData represents the business data for a site and its lists with computed statistics.
+// SiteWithListsData represents a site and its lists with computed statistics.
 type SiteWithListsData struct {
 	Site             *sharepoint.Site
 	Lists            []*sharepoint.List
@@ -20,13 +20,13 @@ type SiteWithListsData struct {
 	AuditRunID       int64
 }
 
-// SiteContentService handles business logic for site content hierarchy operations using aggregate repository.
+// SiteContentService handles site content operations.
 type SiteContentService struct {
 	contentAggregate contracts.SiteContentAggregateRepository
 	auditRunID       int64 // For audit-scoped operations
 }
 
-// NewSiteContentService creates a new site content service with aggregate repository dependency injection.
+// NewSiteContentService creates a new site content service.
 func NewSiteContentService(
 	contentAggregate contracts.SiteContentAggregateRepository,
 ) *SiteContentService {
@@ -52,7 +52,7 @@ func newSiteContentService(
 	}
 }
 
-// GetSiteWithLists retrieves a site and all its lists with computed statistics and audit metadata.
+// GetSiteWithLists retrieves a site and its lists with statistics.
 func (s *SiteContentService) GetSiteWithLists(ctx context.Context, siteID int64) (*SiteWithListsData, error) {
 	// Get site with metadata from aggregate repository
 	siteWithMeta, err := s.contentAggregate.GetSiteWithMetadata(ctx, siteID)

@@ -25,7 +25,7 @@ type Config struct {
 	SerializeWrites   bool          `env:"DB_SERIALIZE_WRITES" default:"false"`
 }
 
-// Database wraps the SQL database connections and provides managed access
+// Database wraps SQL database connections.
 type Database struct {
 	readDB       *sql.DB     // Connection pool for reads
 	writeDB      *sql.DB     // Serialized connection for writes

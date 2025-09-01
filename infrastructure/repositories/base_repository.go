@@ -8,7 +8,7 @@ import (
 	"spaudit/gen/db"
 )
 
-// BaseRepository provides common SQL type conversion methods and database access that can be embedded in all repositories.
+// BaseRepository contains common SQL type conversion methods and database access.
 type BaseRepository struct {
 	db *database.Database
 }

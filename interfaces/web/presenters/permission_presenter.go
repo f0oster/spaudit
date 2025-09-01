@@ -149,8 +149,8 @@ type ResolvedAssignmentCollection struct {
 	UnknownCount        int
 }
 
-// ListAnalytics represents comprehensive permission analytics for a SharePoint list.
-// Used for dashboard display and risk assessment visualization.
+// ListAnalytics represents permission analytics for a SharePoint list.
+// Used for dashboard display and risk assessment.
 type ListAnalytics struct {
 	// Basic list info
 	List ListSummary

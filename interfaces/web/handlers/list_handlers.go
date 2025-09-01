@@ -1,4 +1,4 @@
-// Package handlers provides HTTP request handlers for the web interface.
+// Package handlers contains HTTP request handlers for the web interface.
 package handlers
 
 import (

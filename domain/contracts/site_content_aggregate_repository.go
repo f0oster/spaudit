@@ -7,8 +7,7 @@ import (
 	"spaudit/domain/sharepoint"
 )
 
-// SiteContentAggregateRepository handles business operations that span site, list, item, assignment, and sharing concerns.
-// This aggregate repository encapsulates cross-entity operations and provides atomic business transactions.
+// SiteContentAggregateRepository handles operations across sites, lists, items, assignments, and sharing.
 type SiteContentAggregateRepository interface {
 	// Site operations with metadata
 	GetSiteWithMetadata(ctx context.Context, siteID int64) (*SiteWithMetadata, error)

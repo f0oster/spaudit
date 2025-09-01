@@ -37,9 +37,9 @@ type SharingPatternAnalysis struct {
 	HighRiskItems       []string
 }
 
-// SharingService provides business logic for analyzing SharePoint sharing links
+// SharingService analyzes SharePoint sharing links.
 type SharingService struct {
-	// Pure business logic - no external dependencies
+	// No external dependencies
 	// Future: could add configuration for risk thresholds, link type rules, etc.
 }
 

@@ -51,9 +51,8 @@ type ListContentSummary struct {
 	RiskAssessment *ContentRiskAssessment
 }
 
-// ContentService provides business logic for content analysis and scanning
+// ContentService analyzes content and scans files.
 type ContentService struct {
-	// Pure business logic - no external dependencies
 	// Configuration for file type categorization, risk thresholds, etc.
 	sensitiveExtensions  []string
 	documentExtensions   []string
@@ -73,7 +72,7 @@ func NewContentService() *ContentService {
 	}
 }
 
-// AnalyzeItems performs comprehensive content analysis on a collection of items
+// AnalyzeItems analyzes content metrics for a collection of items
 func (s *ContentService) AnalyzeItems(items []*Item) *ContentAnalysis {
 	analysis := &ContentAnalysis{
 		FilesByExtension: make(map[string]int64),

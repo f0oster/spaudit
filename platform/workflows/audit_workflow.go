@@ -15,7 +15,7 @@ import (
 	"spaudit/logging"
 )
 
-// AuditWorkflowResult represents the comprehensive results of an audit workflow
+// AuditWorkflowResult contains audit workflow results.
 type AuditWorkflowResult struct {
 	SiteID          int64
 	SiteURL         string
@@ -40,7 +40,7 @@ type AuditWorkflowResult struct {
 	Duration    time.Duration
 }
 
-// AuditWorkflow orchestrates the complete audit process using domain services
+// AuditWorkflow runs the complete audit process using domain services.
 type AuditWorkflow struct {
 	// Domain services (pure business logic)
 	contentService     *sharepoint.ContentService
@@ -62,7 +62,7 @@ type AuditWorkflow struct {
 	progressReporter audit.ProgressReporter
 }
 
-// NewAuditWorkflow creates a new audit workflow with domain services
+// NewAuditWorkflow creates a new audit workflow.
 func NewAuditWorkflow(
 	auditRepo contracts.SharePointAuditRepository,
 	sharingRepo contracts.SharingRepository,
@@ -92,7 +92,7 @@ func (w *AuditWorkflow) SetProgressReporter(reporter audit.ProgressReporter) {
 	w.progressReporter = reporter
 }
 
-// ExecuteSiteAudit orchestrates a complete site audit using domain services
+// ExecuteSiteAudit executes a complete site audit using domain services.
 func (w *AuditWorkflow) ExecuteSiteAudit(ctx context.Context, job *jobs.Job, siteURL string) (*AuditWorkflowResult, error) {
 	// Get audit run ID from job
 	auditRunID := job.GetAuditRunID()
@@ -115,7 +115,7 @@ func (w *AuditWorkflow) ExecuteSiteAudit(ctx context.Context, job *jobs.Job, sit
 	}
 
 	// Phase 1: Full Site Data Collection using proven auditor
-	w.reportProgress(audit.StandardStages.WebDiscovery, "Performing comprehensive site audit", 10)
+	w.reportProgress(audit.StandardStages.WebDiscovery, "Starting site audit", 10)
 	siteID, err := w.performFullSiteAudit(ctx, auditRunID, siteURL, parameters)
 	if err != nil {
 		return nil, fmt.Errorf("full site audit: %w", err)
@@ -153,7 +153,7 @@ func (w *AuditWorkflow) ExecuteSiteAudit(ctx context.Context, job *jobs.Job, sit
 
 // Private orchestration methods
 
-// analyzeContent performs comprehensive content analysis using domain services
+// analyzeContent analyzes site content using domain services.
 func (w *AuditWorkflow) analyzeContent(ctx context.Context, siteID int64, result *AuditWorkflowResult) error {
 	// Get lists directly from SharePoint (simple approach - sites typically have few lists)
 	// For a full workflow, we'd want to get a web first, but for analysis we can use empty webID
@@ -200,9 +200,8 @@ func (w *AuditWorkflow) analyzeContent(ctx context.Context, siteID int64, result
 func (w *AuditWorkflow) analyzeSharing(ctx context.Context, auditRunID int64, siteID int64, result *AuditWorkflowResult) error {
 	// Set up progress reporting for sharing data collector
 	w.sharingDataCollector.SetProgressReporter(w.progressReporter)
-	
-	// Use the existing sharing data collector to perform comprehensive site sharing collection
-	// This will collect all sharing data using the proven approach
+
+	// Use the existing sharing data collector for site sharing collection
 	if err := w.sharingDataCollector.AuditSiteSharing(ctx, auditRunID, siteID, ""); err != nil {
 		w.logger.Warn("Sharing audit failed, proceeding with available data", "error", err)
 		// Don't fail the workflow - proceed with any available data
@@ -234,7 +233,7 @@ func (w *AuditWorkflow) analyzeSharing(ctx context.Context, auditRunID int64, si
 			sharingData[link.ItemGUID] = append(sharingData[link.ItemGUID], link)
 		}
 
-		// Get items for pattern analysis (we could optimize this by reusing from content analysis)
+		// Get items for pattern analysis (TODO: we could optimize this by reusing from content analysis)
 		items, err := w.itemRepo.GetItemsForList(ctx, siteID, "", 0, 10000) // Get all items
 		if err == nil {
 			sharingPatterns := w.sharingService.AnalyzeSharingPatterns(items, sharingData)
@@ -278,7 +277,7 @@ func (w *AuditWorkflow) analyzePermissions(ctx context.Context, siteID int64, re
 	return nil
 }
 
-// performFullSiteAudit uses the existing proven auditor to perform comprehensive data collection
+// performFullSiteAudit uses the existing auditor for data collection.
 func (w *AuditWorkflow) performFullSiteAudit(ctx context.Context, auditRunID int64, siteURL string, parameters *audit.AuditParameters) (int64, error) {
 	// Use the provided parameters from the web UI
 	// Apply ValidateAndSetDefaults to ensure all fields have reasonable values

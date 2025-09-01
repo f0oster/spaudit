@@ -25,9 +25,8 @@ type SharePointPaginatedResult[T any] struct {
 	NextPageToken interface{} // Opaque token for retrieving the next page
 }
 
-// SharePointClient interface abstracts SharePoint REST API operations for audit data collection.
-// Provides high-level methods for retrieving site structure, permissions, and sharing information
-// while handling authentication, throttling, and API response parsing.
+// SharePointClient abstracts SharePoint REST API operations.
+// Retrieves site structure, permissions, and sharing information.
 type SharePointClient interface {
 	// Site Structure Operations
 	GetSiteWeb(ctx context.Context) (*sharepoint.Web, error)
@@ -45,7 +44,7 @@ type SharePointClient interface {
 	ResolveFileByGUID(ctx context.Context, itemGUID string) (*sharepoint.Item, error)
 	ResolveFolderByGUID(ctx context.Context, itemGUID string) (*sharepoint.Item, error)
 
-	// List Item Batch Operations (for efficient scanning)
+	// List Item Batch Operations
 	CreateListItemsQuery(ctx context.Context, listID string, batchSize int) *api.Items
 	ConvertItemResponse(ctx context.Context, itemResp interface{}, listID string) (*sharepoint.Item, error)
 	ConvertItemWithSensitivityLabel(ctx context.Context, itemResp interface{}, listID string, siteID int64) (*sharepoint.Item, *sharepoint.ItemSensitivityLabel, error)
@@ -193,7 +192,7 @@ func (c *SharePointClientImpl) GetSiteWeb(ctx context.Context) (*sharepoint.Web,
 }
 
 // GetWebLists retrieves all lists for a web, including metadata and permission inheritance info.
-// This provides the foundation for list-level auditing by discovering all available lists.
+// Discovers all available lists for list-level auditing.
 func (c *SharePointClientImpl) GetWebLists(ctx context.Context, webID string) ([]*sharepoint.List, error) {
 	sp := c.gosipAPI.Conf(c.createRequestConfig(ctx))
 	res, err := sp.Web().Lists().Select(ListFields).Expand(`RootFolder`).Get()
@@ -242,7 +241,7 @@ func (c *SharePointClientImpl) GetWebLists(ctx context.Context, webID string) ([
 	return lists, nil
 }
 
-// CreateListItemsQuery creates a Gosip query object for efficient pagination of list items.
+// CreateListItemsQuery creates a Gosip query object for paginated list items.
 // Returns an *api.Items query that can be used with GetPaged() for continuous iteration.
 // The query selects essential metadata and supports both files and folders.
 //

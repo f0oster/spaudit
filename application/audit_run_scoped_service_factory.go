@@ -10,7 +10,7 @@ import (
 	"spaudit/infrastructure/repositories"
 )
 
-// AuditRunScopedServices contains all application services scoped to a specific audit run
+// AuditRunScopedServices contains application services scoped to an audit run.
 type AuditRunScopedServices struct {
 	SiteContentService  *SiteContentService
 	PermissionService   *PermissionService
@@ -18,18 +18,18 @@ type AuditRunScopedServices struct {
 	AuditRunID          int64
 }
 
-// AuditRunScopedServiceFactory creates audit-run-scoped application services
+// AuditRunScopedServiceFactory creates audit-run-scoped services.
 type AuditRunScopedServiceFactory interface {
 	CreateForAuditRun(ctx context.Context, siteID int64, auditRunIDStr string) (*AuditRunScopedServices, error)
 }
 
-// AuditRunScopedServiceFactoryImpl implements the factory
+// AuditRunScopedServiceFactoryImpl implements the factory.
 type AuditRunScopedServiceFactoryImpl struct {
 	repositoryFactory factories.ScopedRepositoryFactory
 	baseAuditRepo     contracts.AuditRepository
 }
 
-// NewAuditRunScopedServiceFactory creates a new service factory
+// NewAuditRunScopedServiceFactory creates a new service factory.
 func NewAuditRunScopedServiceFactory(
 	repositoryFactory factories.ScopedRepositoryFactory,
 	baseAuditRepo contracts.AuditRepository,
@@ -40,7 +40,7 @@ func NewAuditRunScopedServiceFactory(
 	}
 }
 
-// CreateForAuditRun creates audit-run-scoped services
+// CreateForAuditRun creates audit-run-scoped services.
 func (f *AuditRunScopedServiceFactoryImpl) CreateForAuditRun(
 	ctx context.Context,
 	siteID int64,

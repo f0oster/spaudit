@@ -7,7 +7,7 @@ import (
 	"spaudit/domain/sharepoint"
 )
 
-// PermissionAnalysisData represents comprehensive permission analysis results.
+// PermissionAnalysisData represents permission analysis results.
 type PermissionAnalysisData struct {
 	TotalAssignments       int
 	UniqueAssignments      int
@@ -41,13 +41,13 @@ type PermissionAnalysisData struct {
 	RiskFromElevatedAccess float64
 }
 
-// PermissionService handles permission analysis and risk assessment business logic using aggregate repository.
+// PermissionService handles permission analysis and risk assessment.
 type PermissionService struct {
 	permissionAggregate contracts.PermissionAggregateRepository
 	auditRunID          int64 // For audit-scoped operations
 }
 
-// NewPermissionService creates a new permission service with aggregate repository dependency injection.
+// NewPermissionService creates a new permission service.
 func NewPermissionService(
 	permissionAggregate contracts.PermissionAggregateRepository,
 ) *PermissionService {
@@ -73,7 +73,7 @@ func newPermissionService(
 	}
 }
 
-// AnalyzeListPermissions creates comprehensive analytics for a list.
+// AnalyzeListPermissions analyzes permissions for a list.
 func (s *PermissionService) AnalyzeListPermissions(
 	ctx context.Context,
 	siteID int64,

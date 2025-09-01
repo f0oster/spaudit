@@ -7,8 +7,7 @@ import (
 	"spaudit/domain/jobs"
 )
 
-// JobExecutorRegistry manages a registry of job executors for different job types.
-// This enables pluggable job execution while maintaining type safety and clean separation.
+// JobExecutorRegistry manages job executors for different job types.
 type JobExecutorRegistry struct {
 	executors map[jobs.JobType]JobExecutor
 	mutex     sync.RWMutex
@@ -21,8 +20,7 @@ func NewJobExecutorRegistry() *JobExecutorRegistry {
 	}
 }
 
-// RegisterExecutor registers an executor for a specific job type.
-// This allows different parts of the system to provide execution logic for their job types.
+// RegisterExecutor registers an executor for a job type.
 func (r *JobExecutorRegistry) RegisterExecutor(jobType jobs.JobType, executor JobExecutor) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -30,8 +28,7 @@ func (r *JobExecutorRegistry) RegisterExecutor(jobType jobs.JobType, executor Jo
 	r.executors[jobType] = executor
 }
 
-// GetExecutor retrieves the executor for a specific job type.
-// Returns an error if no executor is registered for the given type.
+// GetExecutor retrieves the executor for a job type.
 func (r *JobExecutorRegistry) GetExecutor(jobType jobs.JobType) (JobExecutor, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()

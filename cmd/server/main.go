@@ -56,7 +56,7 @@ func main() {
 	startServer(router, cfg.HTTPAddr, logger, deps, appCancel)
 }
 
-// ApplicationServices groups all business logic services
+// ApplicationServices holds application services.
 type ApplicationServices struct {
 	JobService          application.JobService
 	AuditService        application.AuditService
@@ -187,7 +187,7 @@ func buildRepositories(database *database.Database) *RepositoryBundle {
 	}
 }
 
-// buildApplicationServices creates all business logic services with proper dependency injection
+// buildApplicationServices creates application services with dependency injection.
 func buildApplicationServices(appCtx context.Context, db *database.Database, repos *RepositoryBundle) *ApplicationServices {
 	// Create event bus for job events
 	eventBus := events.NewJobEventBus()
@@ -207,7 +207,7 @@ func buildApplicationServices(appCtx context.Context, db *database.Database, rep
 	jobService := application.NewJobService(repos.JobRepo, repos.AuditRepo, registry, nil, eventBus)
 	auditService := application.NewAuditService(jobService, db)
 
-	// Domain services with aggregate repository dependency injection
+	// Services using aggregate repositories
 	siteContentService := application.NewSiteContentService(
 		repos.SiteContentAggregate,
 	)
@@ -275,7 +275,7 @@ func buildPresentationLayer(appCtx context.Context, services *ApplicationService
 	}
 }
 
-// buildDependencies orchestrates the creation of all application dependencies
+// buildDependencies creates all application dependencies
 func buildDependencies(appCtx context.Context, db *database.Database, logger *logging.Logger) *Dependencies {
 	queries := db.Queries()
 

@@ -11,7 +11,7 @@ import (
 	"spaudit/logging"
 )
 
-// SharingDataCollector handles comprehensive sharing data collection
+// SharingDataCollector collects sharing data.
 type SharingDataCollector struct {
 	spClient         spclient.SharePointClient
 	repo             contracts.SharePointAuditRepository
@@ -41,7 +41,7 @@ func (s *SharingDataCollector) SetProgressReporter(reporter audit.ProgressReport
 	}
 }
 
-// AuditSiteSharing performs comprehensive sharing audit for a site
+// AuditSiteSharing audits site sharing links.
 func (s *SharingDataCollector) AuditSiteSharing(ctx context.Context, auditRunID int64, siteID int64, siteURL string) error {
 	// Defensive checks
 	if s == nil {
@@ -66,7 +66,7 @@ func (s *SharingDataCollector) AuditSiteSharing(ctx context.Context, auditRunID 
 		return fmt.Errorf("sharing service cannot be nil")
 	}
 
-	s.logger.Audit("Starting comprehensive sharing audit", siteURL)
+	s.logger.Audit("Starting sharing audit", siteURL)
 
 	// Step 1: Find all sharing links in the principals table (not just flexible)
 	s.progressReporter.ReportProgress(audit.StandardStages.Sharing, "Discovering sharing links...", 0)
@@ -101,7 +101,7 @@ func (s *SharingDataCollector) AuditSiteSharing(ctx context.Context, auditRunID 
 
 	s.progressReporter.ReportProgress(audit.StandardStages.Sharing,
 		fmt.Sprintf("Completed - %d sharing links processed", len(allSharingLinks)), 0)
-	s.logger.Audit("Completed comprehensive sharing audit", siteURL)
+	s.logger.Audit("Completed sharing audit", siteURL)
 	return nil
 }
 

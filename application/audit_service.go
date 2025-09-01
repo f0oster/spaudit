@@ -13,7 +13,7 @@ import (
 	"spaudit/logging"
 )
 
-// AuditService defines the interface for audit operations used by job and handler layers.
+// AuditService defines audit operations.
 type AuditService interface {
 	// Methods needed by AuditHandlers.
 	QueueAudit(ctx context.Context, siteURL string, parameters *audit.AuditParameters) (*audit.AuditRequest, error)
@@ -27,14 +27,14 @@ type AuditService interface {
 	GetAuditRunsForSite(ctx context.Context, siteID int64, limit int) ([]*audit.AuditRun, error)
 }
 
-// AuditServiceImpl is the production implementation of AuditService using JobService for management.
+// AuditServiceImpl implements AuditService.
 type AuditServiceImpl struct {
 	jobService JobService
 	db         *database.Database
 	logger     *logging.Logger
 }
 
-// NewAuditService creates a new audit service using platform workflows.
+// NewAuditService creates a new audit service.
 func NewAuditService(
 	jobService JobService,
 	db *database.Database,

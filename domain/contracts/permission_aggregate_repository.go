@@ -13,9 +13,8 @@ type PermissionAnalysisComponents struct {
 	List         *sharepoint.List
 }
 
-// PermissionAggregateRepository handles permission analysis operations that span assignments, items, and sharing.
-// This aggregate repository encapsulates complex permission analytics and risk assessment business logic.
+// PermissionAggregateRepository handles permission analysis across assignments, items, and sharing.
 type PermissionAggregateRepository interface {
-	// Get raw components for permission analysis - service will do the business logic (audit-scoped)
+	// Get raw components for permission analysis (audit-scoped)
 	GetPermissionAnalysisComponents(ctx context.Context, siteID int64, auditRunID int64, list *sharepoint.List) (*PermissionAnalysisComponents, error)
 }

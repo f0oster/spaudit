@@ -16,7 +16,7 @@ import (
 	"spaudit/logging"
 )
 
-// EventPublisher defines interface for publishing domain events
+// EventPublisher publishes domain events.
 type EventPublisher interface {
 	PublishJobCompleted(event events.JobCompletedEvent)
 	PublishJobFailed(event events.JobFailedEvent)
@@ -24,7 +24,7 @@ type EventPublisher interface {
 	PublishSiteAuditCompleted(event events.SiteAuditCompletedEvent)
 }
 
-// JobServiceImpl provides job orchestration service implementation
+// JobServiceImpl implements job orchestration.
 type JobServiceImpl struct {
 	jobRepo      contracts.JobRepository
 	auditRepo    contracts.AuditRepository
@@ -57,7 +57,7 @@ func NewJobService(
 	}
 }
 
-// StartJob creates and starts a job using the registered executor for the job type
+// StartJob creates and starts a job.
 func (s *JobServiceImpl) StartJob(jobType jobs.JobType, params JobParams) (*jobs.Job, error) {
 	// Get executor for this job type
 	executor, err := s.registry.GetExecutor(jobType)

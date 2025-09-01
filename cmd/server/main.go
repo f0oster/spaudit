@@ -21,6 +21,7 @@ import (
 	jobsdom "spaudit/domain/jobs"
 	"spaudit/gen/db"
 	"spaudit/infrastructure/config"
+	infrafactories "spaudit/infrastructure/factories"
 	"spaudit/infrastructure/repositories"
 	"spaudit/interfaces/web/handlers"
 	"spaudit/interfaces/web/presenters"
@@ -63,6 +64,7 @@ type ApplicationServices struct {
 	PermissionService   *application.PermissionService
 	SiteBrowsingService *application.SiteBrowsingService
 	EventBus            *events.JobEventBus
+	ServiceFactory      application.AuditRunScopedServiceFactory
 }
 
 // PresentationLayer groups all presentation components
@@ -131,13 +133,12 @@ func initializeDatabase(cfg *config.AppConfig, logger *logging.Logger) *database
 
 // RepositoryBundle holds all repository implementations
 type RepositoryBundle struct {
-	JobRepo        contracts.JobRepository
-	AuditRepo      contracts.AuditRepository
-	SiteRepo       contracts.SiteRepository
-	ListRepo       contracts.ListRepository
-	AssignmentRepo contracts.AssignmentRepository
-	ItemRepo       contracts.ItemRepository
-	SharingRepo    contracts.SharingRepository
+	JobRepo     contracts.JobRepository
+	AuditRepo   contracts.AuditRepository
+	SiteRepo    contracts.SiteRepository
+	ListRepo    contracts.ListRepository
+	ItemRepo    contracts.ItemRepository
+	SharingRepo contracts.SharingRepository
 
 	// Aggregate repositories
 	SiteContentAggregate contracts.SiteContentAggregateRepository
@@ -154,7 +155,6 @@ func buildRepositories(database *database.Database) *RepositoryBundle {
 	auditRepo := repositories.NewSqlcAuditRepository(database)
 	siteRepo := repositories.NewSqlcSiteRepository(database)
 	listRepo := repositories.NewSqlcListRepository(database)
-	assignmentRepo := repositories.NewSqlcAssignmentRepository(database)
 	itemRepo := repositories.NewSqlcItemRepository(database)
 	sharingRepo := repositories.NewSqlcSharingRepository(database)
 
@@ -164,25 +164,22 @@ func buildRepositories(database *database.Database) *RepositoryBundle {
 		siteRepo,
 		listRepo,
 		jobRepo,
-		assignmentRepo,
 		itemRepo,
 		sharingRepo,
 	)
 	permissionAggregate := repositories.NewPermissionAggregateRepository(
 		baseRepo,
-		assignmentRepo,
 		itemRepo,
 		sharingRepo,
 	)
 
 	return &RepositoryBundle{
-		JobRepo:        jobRepo,
-		AuditRepo:      auditRepo,
-		SiteRepo:       siteRepo,
-		ListRepo:       listRepo,
-		AssignmentRepo: assignmentRepo,
-		ItemRepo:       itemRepo,
-		SharingRepo:    sharingRepo,
+		JobRepo:     jobRepo,
+		AuditRepo:   auditRepo,
+		SiteRepo:    siteRepo,
+		ListRepo:    listRepo,
+		ItemRepo:    itemRepo,
+		SharingRepo: sharingRepo,
 
 		// Aggregate repositories
 		SiteContentAggregate: siteContentAggregate,
@@ -219,6 +216,10 @@ func buildApplicationServices(appCtx context.Context, db *database.Database, rep
 	)
 	siteBrowsingService := application.NewSiteBrowsingService(repos.SiteContentAggregate)
 
+	// Create service factory for audit-run-scoped services
+	repositoryFactory := infrafactories.NewScopedRepositoryFactory(db)
+	serviceFactory := application.NewAuditRunScopedServiceFactory(repositoryFactory, repos.AuditRepo)
+
 	return &ApplicationServices{
 		JobService:          jobService,
 		AuditService:        auditService,
@@ -226,6 +227,7 @@ func buildApplicationServices(appCtx context.Context, db *database.Database, rep
 		PermissionService:   permissionService,
 		SiteBrowsingService: siteBrowsingService,
 		EventBus:            eventBus,
+		ServiceFactory:      serviceFactory,
 	}
 }
 
@@ -245,9 +247,11 @@ func buildPresentationLayer(appCtx context.Context, services *ApplicationService
 		services.PermissionService,
 		services.SiteBrowsingService,
 		services.JobService,
+		services.AuditService,
 		listPresenter,
 		permissionPresenter,
 		sitePresenter,
+		services.ServiceFactory,
 	)
 	auditHandlers := handlers.NewAuditHandlers(services.AuditService, auditPresenter, sseManager)
 	jobHandlers := handlers.NewJobHandlers(services.JobService, jobPresenter)
@@ -363,29 +367,39 @@ func setupApplicationRoutes(r *chi.Mux, deps *Dependencies) {
 	// Main pages
 	r.Get("/", deps.Presentation.ListHandlers.Home)
 
-	// Site management
+	// Site management (non-audit scoped)
 	r.Get("/sites", deps.Presentation.ListHandlers.SitesTable)
 	r.Get("/sites/search", deps.Presentation.ListHandlers.SearchSites)
-	r.Get("/sites/{siteID}/lists", deps.Presentation.ListHandlers.SiteListsPage)
-	r.Get("/sites/{siteID}/lists/search", deps.Presentation.ListHandlers.SearchLists)
+	
+
+	// API endpoints for audit runs
+	r.Get("/api/sites/{siteID}/audit-runs", deps.Presentation.ListHandlers.GetAuditRunsForSite)
+	
+	// Audit-run-scoped routes
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/lists", deps.Presentation.ListHandlers.SiteListsPage)
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/lists/search", deps.Presentation.ListHandlers.SearchLists)
 
 	// List details
-	r.Get("/sites/{siteID}/lists/{listID}", deps.Presentation.ListHandlers.ListDetail)
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/lists/{listID}", deps.Presentation.ListHandlers.ListDetail)
 
 	// List tabs (HTMX partials)
-	r.Get("/sites/{siteID}/tabs/{listID}/overview", deps.Presentation.ListHandlers.OverviewTab)
-	r.Get("/sites/{siteID}/tabs/{listID}/assignments", deps.Presentation.ListHandlers.AssignmentsTab)
-	r.Get("/sites/{siteID}/tabs/{listID}/items", deps.Presentation.ListHandlers.ItemsTab)
-	r.Get("/sites/{siteID}/tabs/{listID}/links", deps.Presentation.ListHandlers.LinksTab)
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/tabs/{listID}/overview", deps.Presentation.ListHandlers.OverviewTab)
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/tabs/{listID}/assignments", deps.Presentation.ListHandlers.AssignmentsTab)
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/tabs/{listID}/items", deps.Presentation.ListHandlers.ItemsTab)
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/tabs/{listID}/links", deps.Presentation.ListHandlers.LinksTab)
 
 	// Object operations (HTMX partials)
-	r.Get("/sites/{siteID}/object/{otype}/{okey}/assignments", deps.Presentation.ListHandlers.GetObjectAssignments)
-	r.Post("/sites/{siteID}/assignments/{uniqueID}/toggle", deps.Presentation.ListHandlers.ToggleAssignment)
-	r.Post("/sites/{siteID}/items/{itemGUID}/assignments/toggle", deps.Presentation.ListHandlers.ToggleItemAssignments)
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/object/{otype}/{okey}/assignments", deps.Presentation.ListHandlers.GetObjectAssignments)
+	r.Post("/sites/{siteID}/audit-runs/{auditRunID}/assignments/{uniqueID}/toggle", deps.Presentation.ListHandlers.ToggleAssignment)
+	r.Post("/sites/{siteID}/audit-runs/{auditRunID}/items/{itemGUID}/assignments/toggle", deps.Presentation.ListHandlers.ToggleItemAssignments)
 
 	// Sharing link operations (HTMX partials)
-	r.Get("/sites/{siteID}/sharing-links/{linkID}/members", deps.Presentation.ListHandlers.GetSharingLinkMembers)
-	r.Post("/sites/{siteID}/sharing-links/{linkID}/members/toggle", deps.Presentation.ListHandlers.ToggleSharingLinkMembers)
+	r.Get("/sites/{siteID}/audit-runs/{auditRunID}/sharing-links/{linkID}/members", deps.Presentation.ListHandlers.GetSharingLinkMembers)
+	r.Post("/sites/{siteID}/audit-runs/{auditRunID}/sharing-links/{linkID}/members/toggle", deps.Presentation.ListHandlers.ToggleSharingLinkMembers)
+	
+	// Audit run switching
+	r.Get("/sites/{siteID}/switch-audit-run", deps.Presentation.ListHandlers.SwitchAuditRun)
+	r.Post("/sites/{siteID}/switch-audit-run", deps.Presentation.ListHandlers.SwitchAuditRun)
 }
 
 func setupAuditRoutes(r *chi.Mux, deps *Dependencies) {

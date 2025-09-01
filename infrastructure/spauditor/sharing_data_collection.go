@@ -210,7 +210,7 @@ func (s *SharingDataCollector) auditFlexibleSharingLink(ctx context.Context, aud
 	}
 
 	// Save sharing links using repository pattern
-	if err := s.repo.SaveSharingLinks(ctx, auditRunID, sharingInfo.Links); err != nil {
+	if err := s.repo.SaveSharingLinks(ctx, sharingInfo.Links); err != nil {
 		return fmt.Errorf("save sharing links for item %s (site_id=%d, link_count=%d): %w",
 			link.ItemGUID, siteID, len(sharingInfo.Links), err)
 	}
@@ -297,7 +297,7 @@ func (s *SharingDataCollector) ensureItemExists(ctx context.Context, auditRunID 
 		}
 	} else {
 		// Item doesn't exist by any method, save it using repository
-		if err := s.repo.SaveItem(ctx, auditRunID, item); err != nil {
+		if err := s.repo.SaveItem(ctx, item); err != nil {
 			return fmt.Errorf("save new item %s (site_id=%d, list_id=%s, name=%s): %w",
 				item.GUID, siteID, item.ListID, item.Name, err)
 		}

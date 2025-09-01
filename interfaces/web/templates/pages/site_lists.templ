@@ -4,12 +4,16 @@ import (
   "spaudit/interfaces/web/presenters"
   "spaudit/interfaces/web/templates/components/core"
   "spaudit/interfaces/web/templates/components/site"
+  "spaudit/interfaces/web/templates/components"
 )
 
 templ SiteListsPage(vm presenters.SiteListsVM) {
   @core.Layout(vm.Site.Title + " · Lists") {
     @site.SiteBreadcrumbs(vm.Site)
     @site.SiteHeader(vm.Site)
+    if len(vm.AuditRuns) > 0 {
+      @components.AuditRunSelector(vm.Site.SiteID, vm.AuditRunID, vm.AuditRuns)
+    }
     @site.SiteStatsGrid(vm)
     @site.SiteListsTable(vm)
   }

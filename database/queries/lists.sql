@@ -39,3 +39,24 @@ FROM lists WHERE site_id = sqlc.arg(site_id) AND list_id = sqlc.arg(list_id);
 SELECT site_id, list_id, web_id, title, url, base_template, item_count, has_unique, audit_run_id
 FROM lists WHERE site_id = sqlc.arg(site_id) AND web_id = sqlc.arg(web_id)
 ORDER BY title;
+
+-- Audit-run-scoped queries for reading historical data
+
+-- name: GetListsByAuditRun :many
+SELECT l.site_id, l.list_id, l.web_id, l.title, l.url, l.base_template, l.item_count, l.has_unique, w.title AS web_title, l.audit_run_id
+FROM lists l
+JOIN webs w ON w.site_id = l.site_id AND w.web_id = l.web_id AND w.audit_run_id = l.audit_run_id
+WHERE l.site_id = sqlc.arg(site_id) AND l.audit_run_id = sqlc.arg(audit_run_id)
+ORDER BY w.title, l.title;
+
+-- name: GetListsWithUniqueByAuditRun :many
+SELECT l.site_id, l.list_id, l.web_id, l.title, l.url, l.base_template, l.item_count, l.has_unique, w.title AS web_title, l.audit_run_id
+FROM lists l
+JOIN webs w ON w.site_id = l.site_id AND w.web_id = l.web_id AND w.audit_run_id = l.audit_run_id
+WHERE l.site_id = sqlc.arg(site_id) AND l.audit_run_id = sqlc.arg(audit_run_id) AND l.has_unique = 1
+ORDER BY w.title, l.title;
+
+-- name: GetListByAuditRun :one
+SELECT site_id, list_id, web_id, title, url, base_template, item_count, has_unique, audit_run_id
+FROM lists 
+WHERE site_id = sqlc.arg(site_id) AND list_id = sqlc.arg(list_id) AND audit_run_id = sqlc.arg(audit_run_id);

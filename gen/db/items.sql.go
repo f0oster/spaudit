@@ -32,7 +32,7 @@ type GetItemByGUIDRow struct {
 	IsFolder     sql.NullBool   `json:"is_folder"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	Name         sql.NullString `json:"name"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) GetItemByGUID(ctx context.Context, arg GetItemByGUIDParams) (GetItemByGUIDRow, error) {
@@ -76,7 +76,7 @@ type GetItemByListAndGUIDRow struct {
 	IsFolder     sql.NullBool   `json:"is_folder"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	Name         sql.NullString `json:"name"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) GetItemByListAndGUID(ctx context.Context, arg GetItemByListAndGUIDParams) (GetItemByListAndGUIDRow, error) {
@@ -120,7 +120,7 @@ type GetItemByListAndIDRow struct {
 	IsFolder     sql.NullBool   `json:"is_folder"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	Name         sql.NullString `json:"name"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) GetItemByListAndID(ctx context.Context, arg GetItemByListAndIDParams) (GetItemByListAndIDRow, error) {
@@ -164,7 +164,7 @@ type GetItemByListItemGUIDRow struct {
 	IsFolder     sql.NullBool   `json:"is_folder"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	Name         sql.NullString `json:"name"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) GetItemByListItemGUID(ctx context.Context, arg GetItemByListItemGUIDParams) (GetItemByListItemGUIDRow, error) {
@@ -202,7 +202,7 @@ type InsertItemParams struct {
 	IsFolder     sql.NullBool   `json:"is_folder"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	Name         sql.NullString `json:"name"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) InsertItem(ctx context.Context, arg InsertItemParams) error {
@@ -248,7 +248,7 @@ type ItemsForListRow struct {
 	IsFolder     sql.NullBool   `json:"is_folder"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	Name         sql.NullString `json:"name"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) ItemsForList(ctx context.Context, arg ItemsForListParams) ([]ItemsForListRow, error) {
@@ -265,6 +265,77 @@ func (q *Queries) ItemsForList(ctx context.Context, arg ItemsForListParams) ([]I
 	var items []ItemsForListRow
 	for rows.Next() {
 		var i ItemsForListRow
+		if err := rows.Scan(
+			&i.SiteID,
+			&i.ItemGuid,
+			&i.ListItemGuid,
+			&i.ListID,
+			&i.ItemID,
+			&i.Url,
+			&i.IsFile,
+			&i.IsFolder,
+			&i.HasUnique,
+			&i.Name,
+			&i.AuditRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const itemsForListByAuditRun = `-- name: ItemsForListByAuditRun :many
+SELECT site_id, item_guid, list_item_guid, list_id, item_id, url, is_file, is_folder, has_unique, name, audit_run_id
+FROM items
+WHERE site_id = ?1 AND list_id = ?2 AND audit_run_id = ?3
+ORDER BY item_id
+LIMIT ?5 OFFSET ?4
+`
+
+type ItemsForListByAuditRunParams struct {
+	SiteID     int64  `json:"site_id"`
+	ListID     string `json:"list_id"`
+	AuditRunID int64  `json:"audit_run_id"`
+	Offset     int64  `json:"offset"`
+	Limit      int64  `json:"limit"`
+}
+
+type ItemsForListByAuditRunRow struct {
+	SiteID       int64          `json:"site_id"`
+	ItemGuid     string         `json:"item_guid"`
+	ListItemGuid sql.NullString `json:"list_item_guid"`
+	ListID       string         `json:"list_id"`
+	ItemID       int64          `json:"item_id"`
+	Url          sql.NullString `json:"url"`
+	IsFile       sql.NullBool   `json:"is_file"`
+	IsFolder     sql.NullBool   `json:"is_folder"`
+	HasUnique    sql.NullBool   `json:"has_unique"`
+	Name         sql.NullString `json:"name"`
+	AuditRunID   int64          `json:"audit_run_id"`
+}
+
+func (q *Queries) ItemsForListByAuditRun(ctx context.Context, arg ItemsForListByAuditRunParams) ([]ItemsForListByAuditRunRow, error) {
+	rows, err := q.db.QueryContext(ctx, itemsForListByAuditRun,
+		arg.SiteID,
+		arg.ListID,
+		arg.AuditRunID,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ItemsForListByAuditRunRow
+	for rows.Next() {
+		var i ItemsForListByAuditRunRow
 		if err := rows.Scan(
 			&i.SiteID,
 			&i.ItemGuid,
@@ -317,7 +388,7 @@ type ItemsWithUniqueForListRow struct {
 	IsFolder     sql.NullBool   `json:"is_folder"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	Name         sql.NullString `json:"name"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) ItemsWithUniqueForList(ctx context.Context, arg ItemsWithUniqueForListParams) ([]ItemsWithUniqueForListRow, error) {
@@ -334,6 +405,77 @@ func (q *Queries) ItemsWithUniqueForList(ctx context.Context, arg ItemsWithUniqu
 	var items []ItemsWithUniqueForListRow
 	for rows.Next() {
 		var i ItemsWithUniqueForListRow
+		if err := rows.Scan(
+			&i.SiteID,
+			&i.ItemGuid,
+			&i.ListItemGuid,
+			&i.ListID,
+			&i.ItemID,
+			&i.Url,
+			&i.IsFile,
+			&i.IsFolder,
+			&i.HasUnique,
+			&i.Name,
+			&i.AuditRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const itemsWithUniqueForListByAuditRun = `-- name: ItemsWithUniqueForListByAuditRun :many
+SELECT site_id, item_guid, list_item_guid, list_id, item_id, url, is_file, is_folder, has_unique, name, audit_run_id
+FROM items
+WHERE site_id = ?1 AND list_id = ?2 AND has_unique = 1 AND audit_run_id = ?3
+ORDER BY item_id
+LIMIT ?5 OFFSET ?4
+`
+
+type ItemsWithUniqueForListByAuditRunParams struct {
+	SiteID     int64  `json:"site_id"`
+	ListID     string `json:"list_id"`
+	AuditRunID int64  `json:"audit_run_id"`
+	Offset     int64  `json:"offset"`
+	Limit      int64  `json:"limit"`
+}
+
+type ItemsWithUniqueForListByAuditRunRow struct {
+	SiteID       int64          `json:"site_id"`
+	ItemGuid     string         `json:"item_guid"`
+	ListItemGuid sql.NullString `json:"list_item_guid"`
+	ListID       string         `json:"list_id"`
+	ItemID       int64          `json:"item_id"`
+	Url          sql.NullString `json:"url"`
+	IsFile       sql.NullBool   `json:"is_file"`
+	IsFolder     sql.NullBool   `json:"is_folder"`
+	HasUnique    sql.NullBool   `json:"has_unique"`
+	Name         sql.NullString `json:"name"`
+	AuditRunID   int64          `json:"audit_run_id"`
+}
+
+func (q *Queries) ItemsWithUniqueForListByAuditRun(ctx context.Context, arg ItemsWithUniqueForListByAuditRunParams) ([]ItemsWithUniqueForListByAuditRunRow, error) {
+	rows, err := q.db.QueryContext(ctx, itemsWithUniqueForListByAuditRun,
+		arg.SiteID,
+		arg.ListID,
+		arg.AuditRunID,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ItemsWithUniqueForListByAuditRunRow
+	for rows.Next() {
+		var i ItemsWithUniqueForListByAuditRunRow
 		if err := rows.Scan(
 			&i.SiteID,
 			&i.ItemGuid,

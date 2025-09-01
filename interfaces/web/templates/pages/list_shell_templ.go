@@ -78,9 +78,9 @@ func ListShell(list presenters.ListSummary, active string, body templ.Component)
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 templ.SafeURL
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs("/sites/" + fmt.Sprintf("%d", list.SiteID) + "/lists")
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs("/sites/" + fmt.Sprintf("%d", list.SiteID) + "/audit-runs/latest/lists")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `interfaces/web/templates/pages/list_shell.templ`, Line: 16, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `interfaces/web/templates/pages/list_shell.templ`, Line: 16, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -90,7 +90,7 @@ func ListShell(list presenters.ListSummary, active string, body templ.Component)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = core.Tabs(list.SiteID, list.ListID, active).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = core.Tabs(list.SiteID, list.AuditRunID, list.ListID, active).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

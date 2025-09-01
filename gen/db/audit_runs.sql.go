@@ -11,6 +11,28 @@ import (
 	"time"
 )
 
+const completeAuditRun = `-- name: CompleteAuditRun :exec
+UPDATE audit_runs
+SET completed_at = CURRENT_TIMESTAMP
+WHERE audit_run_id = ?1
+`
+
+func (q *Queries) CompleteAuditRun(ctx context.Context, auditRunID int64) error {
+	_, err := q.db.ExecContext(ctx, completeAuditRun, auditRunID)
+	return err
+}
+
+const completeAuditRunByJobID = `-- name: CompleteAuditRunByJobID :exec
+UPDATE audit_runs
+SET completed_at = CURRENT_TIMESTAMP
+WHERE job_id = ?1
+`
+
+func (q *Queries) CompleteAuditRunByJobID(ctx context.Context, jobID string) error {
+	_, err := q.db.ExecContext(ctx, completeAuditRunByJobID, jobID)
+	return err
+}
+
 const createAuditRun = `-- name: CreateAuditRun :one
 INSERT INTO audit_runs (job_id, site_id, started_at, audit_trigger)
 VALUES (?1, ?2, ?3, ?4)
@@ -63,4 +85,108 @@ func (q *Queries) GetAuditRun(ctx context.Context, auditRunID int64) (GetAuditRu
 		&i.AuditTrigger,
 	)
 	return i, err
+}
+
+const getAuditRunsForSite = `-- name: GetAuditRunsForSite :many
+SELECT audit_run_id, job_id, site_id, started_at, completed_at, audit_trigger
+FROM audit_runs
+WHERE site_id = ?1
+ORDER BY started_at DESC
+LIMIT ?2
+`
+
+type GetAuditRunsForSiteParams struct {
+	SiteID     int64 `json:"site_id"`
+	LimitCount int64 `json:"limit_count"`
+}
+
+type GetAuditRunsForSiteRow struct {
+	AuditRunID   int64          `json:"audit_run_id"`
+	JobID        string         `json:"job_id"`
+	SiteID       int64          `json:"site_id"`
+	StartedAt    time.Time      `json:"started_at"`
+	CompletedAt  sql.NullTime   `json:"completed_at"`
+	AuditTrigger sql.NullString `json:"audit_trigger"`
+}
+
+func (q *Queries) GetAuditRunsForSite(ctx context.Context, arg GetAuditRunsForSiteParams) ([]GetAuditRunsForSiteRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAuditRunsForSite, arg.SiteID, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAuditRunsForSiteRow
+	for rows.Next() {
+		var i GetAuditRunsForSiteRow
+		if err := rows.Scan(
+			&i.AuditRunID,
+			&i.JobID,
+			&i.SiteID,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.AuditTrigger,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLatestAuditRunForSite = `-- name: GetLatestAuditRunForSite :one
+SELECT audit_run_id, job_id, site_id, started_at, completed_at, audit_trigger
+FROM audit_runs
+WHERE site_id = ?1
+ORDER BY started_at DESC
+LIMIT 1
+`
+
+type GetLatestAuditRunForSiteRow struct {
+	AuditRunID   int64          `json:"audit_run_id"`
+	JobID        string         `json:"job_id"`
+	SiteID       int64          `json:"site_id"`
+	StartedAt    time.Time      `json:"started_at"`
+	CompletedAt  sql.NullTime   `json:"completed_at"`
+	AuditTrigger sql.NullString `json:"audit_trigger"`
+}
+
+func (q *Queries) GetLatestAuditRunForSite(ctx context.Context, siteID int64) (GetLatestAuditRunForSiteRow, error) {
+	row := q.db.QueryRowContext(ctx, getLatestAuditRunForSite, siteID)
+	var i GetLatestAuditRunForSiteRow
+	err := row.Scan(
+		&i.AuditRunID,
+		&i.JobID,
+		&i.SiteID,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.AuditTrigger,
+	)
+	return i, err
+}
+
+const migrateCompletedAuditRuns = `-- name: MigrateCompletedAuditRuns :exec
+UPDATE audit_runs 
+SET completed_at = (
+    SELECT j.completed_at 
+    FROM jobs j 
+    WHERE j.job_id = audit_runs.job_id 
+    AND j.completed_at IS NOT NULL
+)
+WHERE completed_at IS NULL 
+AND job_id IN (
+    SELECT job_id 
+    FROM jobs 
+    WHERE completed_at IS NOT NULL
+)
+`
+
+func (q *Queries) MigrateCompletedAuditRuns(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, migrateCompletedAuditRuns)
+	return err
 }

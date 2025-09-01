@@ -15,19 +15,20 @@ CREATE TABLE sites (
 CREATE TABLE webs (
   site_id         INTEGER NOT NULL REFERENCES sites(site_id),
   web_id          TEXT NOT NULL,
+  audit_run_id    INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   title           TEXT,
   server_relative_url TEXT,
   url             TEXT,
   template        TEXT,
   has_unique      BOOLEAN DEFAULT FALSE,
   created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  audit_run_id    INTEGER REFERENCES audit_runs(audit_run_id),
   PRIMARY KEY (site_id, web_id, audit_run_id)
 );
 
 CREATE TABLE lists (
   site_id         INTEGER NOT NULL REFERENCES sites(site_id),
   list_id         TEXT NOT NULL,
+  audit_run_id    INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   web_id          TEXT NOT NULL,
   title           TEXT NOT NULL,
   base_template   INTEGER,
@@ -36,7 +37,6 @@ CREATE TABLE lists (
   has_unique      BOOLEAN DEFAULT FALSE,
   hidden          BOOLEAN DEFAULT FALSE,
   created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  audit_run_id    INTEGER REFERENCES audit_runs(audit_run_id),
   PRIMARY KEY (site_id, list_id, audit_run_id),
   FOREIGN KEY (site_id, web_id, audit_run_id) REFERENCES webs(site_id, web_id, audit_run_id)
 );
@@ -44,6 +44,7 @@ CREATE TABLE lists (
 CREATE TABLE items (
   site_id          INTEGER NOT NULL REFERENCES sites(site_id),
   item_guid        TEXT NOT NULL,
+  audit_run_id     INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   list_id          TEXT NOT NULL,
   item_id          INTEGER NOT NULL,
   list_item_guid   TEXT,
@@ -56,7 +57,6 @@ CREATE TABLE items (
   has_unique       BOOLEAN DEFAULT FALSE,
   created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
   modified_at      DATETIME,
-  audit_run_id     INTEGER REFERENCES audit_runs(audit_run_id),
   PRIMARY KEY (site_id, item_guid, audit_run_id),
   FOREIGN KEY (site_id, list_id, audit_run_id) REFERENCES lists(site_id, list_id, audit_run_id)
 );
@@ -68,23 +68,23 @@ CREATE TABLE items (
 CREATE TABLE principals (
   site_id        INTEGER NOT NULL REFERENCES sites(site_id),
   principal_id   INTEGER NOT NULL,
+  audit_run_id   INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   title          TEXT,
   login_name     TEXT,
   email          TEXT,
   principal_type INTEGER NOT NULL,
   created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
-  audit_run_id   INTEGER REFERENCES audit_runs(audit_run_id),
   PRIMARY KEY (site_id, principal_id, audit_run_id)
 );
 
 CREATE TABLE role_definitions (
   site_id     INTEGER NOT NULL REFERENCES sites(site_id),
   role_def_id INTEGER NOT NULL,
+  audit_run_id INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   name        TEXT NOT NULL,
   description TEXT,
   base_permissions INTEGER,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-  audit_run_id INTEGER REFERENCES audit_runs(audit_run_id),
   PRIMARY KEY (site_id, role_def_id, audit_run_id)
 );
 
@@ -94,9 +94,9 @@ CREATE TABLE role_assignments (
   object_key   TEXT NOT NULL,
   principal_id INTEGER NOT NULL,
   role_def_id  INTEGER NOT NULL,
+  audit_run_id INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   inherited    BOOLEAN DEFAULT FALSE,
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-  audit_run_id INTEGER REFERENCES audit_runs(audit_run_id),
   PRIMARY KEY (site_id, object_type, object_key, principal_id, role_def_id, audit_run_id),
   FOREIGN KEY (site_id, principal_id, audit_run_id) REFERENCES principals(site_id, principal_id, audit_run_id),
   FOREIGN KEY (site_id, role_def_id, audit_run_id) REFERENCES role_definitions(site_id, role_def_id, audit_run_id)
@@ -109,6 +109,7 @@ CREATE TABLE role_assignments (
 CREATE TABLE sharing_links (
   site_id                       INTEGER NOT NULL REFERENCES sites(site_id),
   link_id                       TEXT NOT NULL,
+  audit_run_id                  INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   item_guid                     TEXT,
   file_folder_unique_id         TEXT,
   url                           TEXT,
@@ -151,8 +152,6 @@ CREATE TABLE sharing_links (
   share_token                   TEXT,
   sharing_link_status           INTEGER,
   
-  audit_run_id                  INTEGER REFERENCES audit_runs(audit_run_id),
-  
   PRIMARY KEY (site_id, link_id, audit_run_id),
   UNIQUE (site_id, file_folder_unique_id, url, link_kind, scope, audit_run_id),
   FOREIGN KEY (site_id, item_guid, audit_run_id) REFERENCES items(site_id, item_guid, audit_run_id),
@@ -164,10 +163,10 @@ CREATE TABLE sharing_link_members (
   site_id      INTEGER NOT NULL REFERENCES sites(site_id),
   link_id      TEXT NOT NULL,
   principal_id INTEGER NOT NULL,
+  audit_run_id INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-  audit_run_id INTEGER REFERENCES audit_runs(audit_run_id),
   PRIMARY KEY (site_id, link_id, principal_id, audit_run_id),
-  FOREIGN KEY (site_id, link_id) REFERENCES sharing_links(site_id, link_id),
+  FOREIGN KEY (site_id, link_id, audit_run_id) REFERENCES sharing_links(site_id, link_id, audit_run_id),
   FOREIGN KEY (site_id, principal_id, audit_run_id) REFERENCES principals(site_id, principal_id, audit_run_id)
 );
 
@@ -175,10 +174,10 @@ CREATE TABLE sharing_link_invitations (
   site_id      INTEGER NOT NULL REFERENCES sites(site_id),
   link_id      TEXT NOT NULL,
   email        TEXT NOT NULL,
+  audit_run_id INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-  audit_run_id INTEGER REFERENCES audit_runs(audit_run_id),
   PRIMARY KEY (site_id, link_id, email, audit_run_id),
-  FOREIGN KEY (site_id, link_id) REFERENCES sharing_links(site_id, link_id)
+  FOREIGN KEY (site_id, link_id, audit_run_id) REFERENCES sharing_links(site_id, link_id, audit_run_id)
 );
 
 -- ====================
@@ -189,6 +188,7 @@ CREATE TABLE sharing_link_invitations (
 CREATE TABLE sensitivity_labels (
   site_id                              INTEGER NOT NULL REFERENCES sites(site_id),
   item_guid                           TEXT NOT NULL,
+  audit_run_id                        INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   sensitivity_label_id                TEXT,
   display_name                        TEXT,
   color                               TEXT,
@@ -207,13 +207,14 @@ CREATE TABLE sensitivity_labels (
   label_hash                          TEXT, -- vti_x005f_iplabelhash
   
   created_at                          DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (site_id, item_guid),
-  FOREIGN KEY (site_id, item_guid) REFERENCES items(site_id, item_guid)
+  PRIMARY KEY (site_id, item_guid, audit_run_id),
+  FOREIGN KEY (site_id, item_guid, audit_run_id) REFERENCES items(site_id, item_guid, audit_run_id)
 );
 
 -- Sharing governance information per site
 CREATE TABLE sharing_governance (
-  site_id                                         INTEGER PRIMARY KEY REFERENCES sites(site_id),
+  site_id                                         INTEGER NOT NULL REFERENCES sites(site_id),
+  audit_run_id                                    INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   tenant_id                                       TEXT,
   tenant_display_name                             TEXT,
   sharepoint_site_id                              TEXT,
@@ -227,12 +228,14 @@ CREATE TABLE sharing_governance (
   site_ib_segment_ids                             TEXT, -- JSON array
   enforce_ib_segment_filtering                    BOOLEAN DEFAULT FALSE,
   created_at                                      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at                                      DATETIME DEFAULT CURRENT_TIMESTAMP
+  updated_at                                      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (site_id, audit_run_id)
 );
 
 -- Sharing abilities matrix
 CREATE TABLE sharing_abilities (
-  site_id                      INTEGER PRIMARY KEY REFERENCES sites(site_id),
+  site_id                      INTEGER NOT NULL REFERENCES sites(site_id),
+  audit_run_id                 INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   can_stop_sharing             BOOLEAN DEFAULT FALSE,
   anonymous_link_abilities     TEXT, -- JSON
   anyone_link_abilities        TEXT, -- JSON  
@@ -240,18 +243,21 @@ CREATE TABLE sharing_abilities (
   people_sharing_link_abilities TEXT, -- JSON
   direct_sharing_abilities     TEXT, -- JSON
   created_at                   DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at                   DATETIME DEFAULT CURRENT_TIMESTAMP
+  updated_at                   DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (site_id, audit_run_id)
 );
 
 -- Recipient limits
 CREATE TABLE recipient_limits (
-  site_id                       INTEGER PRIMARY KEY REFERENCES sites(site_id),
+  site_id                       INTEGER NOT NULL REFERENCES sites(site_id),
+  audit_run_id                  INTEGER NOT NULL REFERENCES audit_runs(audit_run_id),
   check_permissions             TEXT, -- JSON: RecipientLimitsInfo
   grant_direct_access           TEXT, -- JSON: RecipientLimitsInfo
   share_link                    TEXT, -- JSON: RecipientLimitsInfo
   share_link_with_defer_redeem  TEXT, -- JSON: RecipientLimitsInfo
   created_at                    DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at                    DATETIME DEFAULT CURRENT_TIMESTAMP
+  updated_at                    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (site_id, audit_run_id)
 );
 
 -- ====================

@@ -6,7 +6,7 @@ import (
   "spaudit/interfaces/web/templates/components/ui"
 )
 
-templ ListTableRows(lists []presenters.ListSummary) {
+templ ListTableRows(lists []presenters.ListSummary, siteID int64, auditRunID int64) {
   for _, l := range lists {
     <tr class="hover:bg-slate-50 cursor-default group">
       <td class="px-6 py-4">
@@ -23,7 +23,7 @@ templ ListTableRows(lists []presenters.ListSummary) {
         @ui.PermissionsBadge(l.HasUnique)
       </td>
       <td class="px-6 py-4 text-right">
-        <a href={ "/lists/" + l.ListID } 
+        <a href={ "/sites/" + fmt.Sprintf("%d", siteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/lists/" + l.ListID } 
            class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
           View Details →
         </a>

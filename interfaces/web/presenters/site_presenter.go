@@ -1,8 +1,6 @@
 package presenters
 
 import (
-	"strings"
-
 	"spaudit/domain/contracts"
 )
 
@@ -41,29 +39,6 @@ func (p *SitePresenter) ToSitesWithMetadata(sitesData []*contracts.SiteWithMetad
 	return viewModels
 }
 
-// FilterSitesForSearch filters view models based on search criteria.
-func (p *SitePresenter) FilterSitesForSearch(sites []SiteWithMetadata, searchQuery string) []SiteWithMetadata {
-	// Return all sites if no search query provided
-	if strings.TrimSpace(searchQuery) == "" {
-		return sites
-	}
-
-	var filteredSites []SiteWithMetadata
-	searchLower := strings.ToLower(strings.TrimSpace(searchQuery))
-
-	// Apply case-insensitive search across title, URL, and description
-	for _, site := range sites {
-		titleMatch := strings.Contains(strings.ToLower(site.Title), searchLower)
-		urlMatch := strings.Contains(strings.ToLower(site.SiteURL), searchLower)
-		descMatch := strings.Contains(strings.ToLower(site.Description), searchLower)
-
-		if titleMatch || urlMatch || descMatch {
-			filteredSites = append(filteredSites, site)
-		}
-	}
-
-	return filteredSites
-}
 
 // toSiteWithMetadata converts single service data to view model with formatted audit date.
 func (p *SitePresenter) toSiteWithMetadata(siteData *contracts.SiteWithMetadata) SiteWithMetadata {

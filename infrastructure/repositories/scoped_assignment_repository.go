@@ -6,51 +6,64 @@ import (
 	"fmt"
 	"strings"
 
-	"spaudit/database"
 	"spaudit/domain/contracts"
 	"spaudit/domain/sharepoint"
 	"spaudit/gen/db"
 )
 
-// SqlcAssignmentRepository implements contracts.AssignmentRepository using sqlc queries with read/write separation
-type SqlcAssignmentRepository struct {
+// ScopedAssignmentRepository wraps an AssignmentRepository with automatic site and audit run scoping
+type ScopedAssignmentRepository struct {
 	*BaseRepository
+	queries     *db.Queries
+	siteID      int64
+	auditRunID  int64
 }
 
-// NewSqlcAssignmentRepository creates a new assignment repository with read/write database separation
-func NewSqlcAssignmentRepository(database *database.Database) contracts.AssignmentRepository {
-	return &SqlcAssignmentRepository{
-		BaseRepository: NewBaseRepository(database),
+// NewScopedAssignmentRepository creates a new scoped assignment repository
+func NewScopedAssignmentRepository(baseRepo *BaseRepository, queries *db.Queries, siteID, auditRunID int64) contracts.AssignmentRepository {
+	return &ScopedAssignmentRepository{
+		BaseRepository: baseRepo,
+		queries:        queries,
+		siteID:         siteID,
+		auditRunID:     auditRunID,
 	}
 }
 
-// GetAssignmentsForObject retrieves role assignments for an object
-func (r *SqlcAssignmentRepository) GetAssignmentsForObject(ctx context.Context, siteID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error) {
-	rows, err := r.ReadQueries().GetAssignmentsForObject(ctx, db.GetAssignmentsForObjectParams{
-		SiteID:     siteID,
+// GetAssignmentsForObject retrieves role assignments for an object scoped to audit run
+func (r *ScopedAssignmentRepository) GetAssignmentsForObject(ctx context.Context, siteID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error) {
+	// Verify the requested siteID matches our scoped siteID
+	if siteID != r.siteID {
+		return nil, contracts.ErrSiteScopeMismatch
+	}
+
+	// Get assignments from database scoped to our audit run
+	rows, err := r.queries.GetAssignmentsForObjectByAuditRun(ctx, db.GetAssignmentsForObjectByAuditRunParams{
+		SiteID:     r.siteID,
 		ObjectType: objectType,
 		ObjectKey:  objectKey,
+		AuditRunID: r.auditRunID,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Transform SQLC rows to domain assignments with complete construction
-	assignments := make([]*sharepoint.Assignment, len(rows))
-	for i, row := range rows {
+	// Convert database rows to domain objects
+	var assignments []*sharepoint.Assignment
+	for _, row := range rows {
+		
 		// Construct complete Principal with all required fields
 		principal := &sharepoint.Principal{
-			SiteID:        siteID, // ✅ Complete construction with required context
+			SiteID:        r.siteID,
 			ID:            row.PrincipalID,
 			PrincipalType: row.PrincipalType,
 			Title:         r.FromNullString(row.PrincipalTitle),
 			LoginName:     r.FromNullString(row.LoginName),
-			Email:         "", // Not available in this query
+			Email:         "",
 		}
 
 		// Construct complete RoleDefinition with all required fields
 		roleDefinition := &sharepoint.RoleDefinition{
-			SiteID:      siteID, // ✅ Complete construction
+			SiteID:      r.siteID,
 			ID:          row.RoleDefID,
 			Name:        row.RoleName,
 			Description: r.FromNullString(row.Description),
@@ -58,26 +71,33 @@ func (r *SqlcAssignmentRepository) GetAssignmentsForObject(ctx context.Context, 
 
 		// Construct complete RoleAssignment with all required fields
 		roleAssignment := &sharepoint.RoleAssignment{
-			SiteID:      siteID,     // ✅ Complete construction
-			ObjectType:  objectType, // ✅ Provided by caller
-			ObjectKey:   objectKey,  // ✅ Provided by caller
+			SiteID:      r.siteID,
+			ObjectType:  objectType,
+			ObjectKey:   objectKey,
 			PrincipalID: row.PrincipalID,
 			RoleDefID:   row.RoleDefID,
 			Inherited:   r.FromNullBool(row.Inherited),
 		}
 
-		assignments[i] = &sharepoint.Assignment{
+		assignment := &sharepoint.Assignment{
 			RoleAssignment: roleAssignment,
 			Principal:      principal,
 			RoleDefinition: roleDefinition,
 		}
+		
+		assignments = append(assignments, assignment)
 	}
 
 	return assignments, nil
 }
 
-// GetResolvedAssignmentsForObject retrieves role assignments with root cause analysis
-func (r *SqlcAssignmentRepository) GetResolvedAssignmentsForObject(ctx context.Context, siteID int64, objectType, objectKey string) ([]*sharepoint.ResolvedAssignment, error) {
+// GetResolvedAssignmentsForObject retrieves role assignments with root cause analysis scoped to audit run
+func (r *ScopedAssignmentRepository) GetResolvedAssignmentsForObject(ctx context.Context, siteID int64, objectType, objectKey string) ([]*sharepoint.ResolvedAssignment, error) {
+	// Verify the requested siteID matches our scoped siteID
+	if siteID != r.siteID {
+		return nil, contracts.ErrSiteScopeMismatch
+	}
+
 	// First get the regular assignments
 	assignments, err := r.GetAssignmentsForObject(ctx, siteID, objectType, objectKey)
 	if err != nil {
@@ -85,8 +105,8 @@ func (r *SqlcAssignmentRepository) GetResolvedAssignmentsForObject(ctx context.C
 	}
 
 	// Get the parent web ID for inheritance analysis
-	webId, err := r.ReadQueries().GetWebIdForObject(ctx, db.GetWebIdForObjectParams{
-		SiteID:     siteID,
+	webId, err := r.queries.GetWebIdForObject(ctx, db.GetWebIdForObjectParams{
+		SiteID:     r.siteID,
 		ObjectType: objectType,
 		ObjectKey:  objectKey,
 	})
@@ -102,7 +122,7 @@ func (r *SqlcAssignmentRepository) GetResolvedAssignmentsForObject(ctx context.C
 	resolved := make([]*sharepoint.ResolvedAssignment, 0, len(assignments))
 
 	for _, assignment := range assignments {
-		rootCauseAnalysis := r.analyzeRootCause(ctx, siteID, assignment, webIdStr)
+		rootCauseAnalysis := r.analyzeRootCause(ctx, assignment, webIdStr)
 		resolved = append(resolved, &sharepoint.ResolvedAssignment{
 			Assignment: assignment,
 			RootCauses: rootCauseAnalysis.RootCauses,
@@ -112,11 +132,11 @@ func (r *SqlcAssignmentRepository) GetResolvedAssignmentsForObject(ctx context.C
 	return resolved, nil
 }
 
-type rootCauseAnalysis struct {
+type scopedRootCauseAnalysis struct {
 	RootCauses []sharepoint.RootCause // All detected sources
 }
 
-func (r *SqlcAssignmentRepository) analyzeRootCause(ctx context.Context, siteID int64, assignment *sharepoint.Assignment, webId string) rootCauseAnalysis {
+func (r *ScopedAssignmentRepository) analyzeRootCause(ctx context.Context, assignment *sharepoint.Assignment, webId string) scopedRootCauseAnalysis {
 	loginName := assignment.Principal.LoginName
 	var rootCauses []sharepoint.RootCause
 
@@ -138,10 +158,11 @@ func (r *SqlcAssignmentRepository) analyzeRootCause(ctx context.Context, siteID 
 	}
 
 	// Check for same-web inheritance - get ALL permissions, not just first
-	rootPerms, err := r.ReadQueries().GetRootPermissionsForPrincipalInWeb(ctx, db.GetRootPermissionsForPrincipalInWebParams{
-		SiteID:      siteID,
+	rootPerms, err := r.queries.GetRootPermissionsForPrincipalInWebByAuditRun(ctx, db.GetRootPermissionsForPrincipalInWebByAuditRunParams{
+		SiteID:      r.siteID,
 		PrincipalID: assignment.Principal.ID,
 		WebID:       webId,
+		AuditRunID:  r.auditRunID,
 	})
 	if err == nil && len(rootPerms) > 0 {
 		// Process ALL root permissions, not just the first one
@@ -173,12 +194,12 @@ func (r *SqlcAssignmentRepository) analyzeRootCause(ctx context.Context, siteID 
 		rootCauses = append(rootCauses, unknownCause)
 	}
 
-	return rootCauseAnalysis{
+	return scopedRootCauseAnalysis{
 		RootCauses: rootCauses,
 	}
 }
 
-func (r *SqlcAssignmentRepository) analyzeSharingLinkRootCause(ctx context.Context, assignment *sharepoint.Assignment, loginName string) sharepoint.RootCause {
+func (r *ScopedAssignmentRepository) analyzeSharingLinkRootCause(ctx context.Context, assignment *sharepoint.Assignment, loginName string) sharepoint.RootCause {
 	// Extract file/folder GUID from sharing link login name
 	// Format: SharingLinks.{GUID}.{Type}.{ShareId}
 	parts := strings.Split(loginName, ".")
@@ -192,8 +213,8 @@ func (r *SqlcAssignmentRepository) analyzeSharingLinkRootCause(ctx context.Conte
 	}
 
 	fileFolderGuid := parts[1]
-	sharedItem, err := r.ReadQueries().GetSharedItemForSharingLink(ctx, db.GetSharedItemForSharingLinkParams{
-		SiteID: assignment.RoleAssignment.SiteID,
+	sharedItem, err := r.queries.GetSharedItemForSharingLink(ctx, db.GetSharedItemForSharingLinkParams{
+		SiteID: r.siteID,
 		FileFolderGuid: sql.NullString{
 			String: fileFolderGuid,
 			Valid:  true,
@@ -215,3 +236,4 @@ func (r *SqlcAssignmentRepository) analyzeSharingLinkRootCause(ctx context.Conte
 		SourceRole:   "File Share",
 	}
 }
+

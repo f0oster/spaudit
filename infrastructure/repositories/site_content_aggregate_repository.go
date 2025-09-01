@@ -12,12 +12,11 @@ import (
 // SiteContentAggregateRepositoryImpl implements the site content aggregate repository by composing entity repositories.
 type SiteContentAggregateRepositoryImpl struct {
 	*BaseRepository
-	siteRepo       contracts.SiteRepository
-	listRepo       contracts.ListRepository
-	jobRepo        contracts.JobRepository
-	assignmentRepo contracts.AssignmentRepository
-	itemRepo       contracts.ItemRepository
-	sharingRepo    contracts.SharingRepository
+	siteRepo    contracts.SiteRepository
+	listRepo    contracts.ListRepository
+	jobRepo     contracts.JobRepository
+	itemRepo    contracts.ItemRepository
+	sharingRepo contracts.SharingRepository
 }
 
 // NewSiteContentAggregateRepository creates a new site content aggregate repository.
@@ -26,7 +25,6 @@ func NewSiteContentAggregateRepository(
 	siteRepo contracts.SiteRepository,
 	listRepo contracts.ListRepository,
 	jobRepo contracts.JobRepository,
-	assignmentRepo contracts.AssignmentRepository,
 	itemRepo contracts.ItemRepository,
 	sharingRepo contracts.SharingRepository,
 ) contracts.SiteContentAggregateRepository {
@@ -35,7 +33,6 @@ func NewSiteContentAggregateRepository(
 		siteRepo:       siteRepo,
 		listRepo:       listRepo,
 		jobRepo:        jobRepo,
-		assignmentRepo: assignmentRepo,
 		itemRepo:       itemRepo,
 		sharingRepo:    sharingRepo,
 	}
@@ -98,14 +95,16 @@ func (r *SiteContentAggregateRepositoryImpl) GetListsForSite(ctx context.Context
 	return r.listRepo.GetAllForSite(ctx, siteID)
 }
 
-// GetListAssignmentsWithRootCause retrieves resolved assignments with root cause analysis for a list.
-func (r *SiteContentAggregateRepositoryImpl) GetListAssignmentsWithRootCause(ctx context.Context, siteID int64, listID string) ([]*sharepoint.ResolvedAssignment, error) {
-	return r.assignmentRepo.GetResolvedAssignmentsForObject(ctx, siteID, "list", listID)
+// GetListAssignmentsWithRootCause retrieves resolved assignments with root cause analysis for a list (audit-scoped).
+func (r *SiteContentAggregateRepositoryImpl) GetListAssignmentsWithRootCause(ctx context.Context, siteID int64, auditRunID int64, listID string) ([]*sharepoint.ResolvedAssignment, error) {
+	scopedAssignmentRepo := NewScopedAssignmentRepository(r.BaseRepository, r.ReadQueries(), siteID, auditRunID)
+	return scopedAssignmentRepo.GetResolvedAssignmentsForObject(ctx, siteID, "list", listID)
 }
 
-// GetAssignmentsForObject retrieves assignments for any object type.
-func (r *SiteContentAggregateRepositoryImpl) GetAssignmentsForObject(ctx context.Context, siteID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error) {
-	return r.assignmentRepo.GetAssignmentsForObject(ctx, siteID, objectType, objectKey)
+// GetAssignmentsForObject retrieves assignments for any object type (audit-scoped).
+func (r *SiteContentAggregateRepositoryImpl) GetAssignmentsForObject(ctx context.Context, siteID int64, auditRunID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error) {
+	scopedAssignmentRepo := NewScopedAssignmentRepository(r.BaseRepository, r.ReadQueries(), siteID, auditRunID)
+	return scopedAssignmentRepo.GetAssignmentsForObject(ctx, siteID, objectType, objectKey)
 }
 
 // GetListItems retrieves items with unique permissions for a list with pagination.

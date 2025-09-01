@@ -14,7 +14,7 @@ import (
 	"spaudit/interfaces/web/templates/components/ui"
 )
 
-func ListTableRows(lists []presenters.ListSummary) templ.Component {
+func ListTableRows(lists []presenters.ListSummary, siteID int64, auditRunID int64) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -101,9 +101,9 @@ func ListTableRows(lists []presenters.ListSummary) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 templ.SafeURL
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs("/lists/" + l.ListID)
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs("/sites/" + fmt.Sprintf("%d", siteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/lists/" + l.ListID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `interfaces/web/templates/pages/list_search.templ`, Line: 26, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `interfaces/web/templates/pages/list_search.templ`, Line: 26, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {

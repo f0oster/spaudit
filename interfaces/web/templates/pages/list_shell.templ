@@ -13,12 +13,12 @@ templ ListShell(list presenters.ListSummary, active string, body templ.Component
         <h2 class="text-xl font-semibold">{ list.Title }</h2>
         <div class="text-sm text-slate-600 break-all">{ list.URL }</div>
       </div>
-      <a href={ "/sites/" + fmt.Sprintf("%d", list.SiteID) + "/lists" } class="text-blue-600 hover:underline">← Back to Site</a>
+      <a href={ "/sites/" + fmt.Sprintf("%d", list.SiteID) + "/audit-runs/latest/lists" } class="text-blue-600 hover:underline">← Back to Site</a>
     </div>
 
     <div class="bg-white border rounded-xl shadow-sm">
       <div class="px-4 pt-3" id="tab-headers">
-        @core.Tabs(list.SiteID, list.ListID, active)
+        @core.Tabs(list.SiteID, list.AuditRunID, list.ListID, active)
       </div>
       <div id="tab-body" class="p-4">
         @body

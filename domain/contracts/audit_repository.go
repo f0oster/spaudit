@@ -39,9 +39,9 @@ type AuditRepository interface {
 	GetItemByListAndID(ctx context.Context, siteID int64, listID string, itemID int64) (*sharepoint.Item, error)
 
 	// Governance operations
-	SaveSharingGovernance(ctx context.Context, siteID int64, sharingInfo *sharepoint.SharingInfo) error
-	SaveSharingAbilities(ctx context.Context, siteID int64, abilities *sharepoint.SharingAbilities) error
-	SaveRecipientLimits(ctx context.Context, siteID int64, limits *sharepoint.RecipientLimits) error
-	SaveSensitivityLabel(ctx context.Context, siteID int64, itemGUID string, label *sharepoint.SensitivityLabelInformation) error
+	SaveSharingGovernance(ctx context.Context, auditRunID, siteID int64, sharingInfo *sharepoint.SharingInfo) error
+	SaveSharingAbilities(ctx context.Context, auditRunID, siteID int64, abilities *sharepoint.SharingAbilities) error
+	SaveRecipientLimits(ctx context.Context, auditRunID, siteID int64, limits *sharepoint.RecipientLimits) error
+	SaveSensitivityLabel(ctx context.Context, auditRunID, siteID int64, itemGUID string, label *sharepoint.SensitivityLabelInformation) error
 	SaveItemSensitivityLabel(ctx context.Context, label *sharepoint.ItemSensitivityLabel) error
 }

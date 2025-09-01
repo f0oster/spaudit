@@ -1,0 +1,73 @@
+package audit
+
+import (
+	"fmt"
+	"time"
+)
+
+type AuditRunOption struct {
+	ID          int64
+	StartedAt   time.Time
+	CompletedAt *time.Time
+	JobID       string
+	IsLatest    bool
+}
+
+templ RunSelector(siteID int64, currentRunID int64, auditRuns []AuditRunOption) {
+	<div class="audit-run-selector bg-white border border-slate-200 rounded-lg p-3 mb-4 shadow-sm">
+		<div class="flex items-center gap-4">
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-medium text-slate-700">📊 Audit Run:</span>
+				<select 
+					id="audit-run-selector" 
+					class="text-sm border border-slate-300 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+					hx-get={ fmt.Sprintf("/sites/%d/switch-audit-run", siteID) }
+					hx-include="this"
+					hx-target="body"
+					hx-push-url="true"
+				>
+					for _, run := range auditRuns {
+						<option 
+							value={ fmt.Sprintf("%d", run.ID) }
+							if run.ID == currentRunID {
+								selected
+							}
+						>
+							if run.IsLatest {
+								Latest - 
+							}
+							Run #{ fmt.Sprintf("%d", run.ID) }
+							({ run.StartedAt.Format("Jan 2, 2006 3:04 PM") })
+							if run.CompletedAt == nil {
+								- Running
+							}
+						</option>
+					}
+				</select>
+			</div>
+			
+			if currentRunID > 0 {
+				<div class="flex items-center gap-2 text-sm text-slate-600">
+					<span class="inline-flex items-center px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">
+						Run #{ fmt.Sprintf("%d", currentRunID) }
+					</span>
+					<span class="text-xs">
+						{ getRunTimestamp(auditRuns, currentRunID) }
+					</span>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+func getRunTimestamp(runs []AuditRunOption, runID int64) string {
+	for _, run := range runs {
+		if run.ID == runID {
+			if run.CompletedAt != nil {
+				return "Completed " + run.CompletedAt.Format("Jan 2, 2006 3:04 PM")
+			}
+			return "Started " + run.StartedAt.Format("Jan 2, 2006 3:04 PM")
+		}
+	}
+	return ""
+}

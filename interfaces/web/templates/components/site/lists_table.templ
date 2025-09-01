@@ -20,7 +20,7 @@ templ SiteListsTable(vm presenters.SiteListsVM) {
 						   name="search" 
 						   placeholder="Filter lists..." 
 						   class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-						   hx-get={ "/sites/" + fmt.Sprintf("%d", vm.Site.SiteID) + "/lists/search" }
+						   hx-get={ "/sites/" + fmt.Sprintf("%d", vm.Site.SiteID) + "/audit-runs/" + fmt.Sprintf("%d", vm.AuditRunID) + "/lists/search" }
 						   hx-target="#lists-table tbody"
 						   hx-trigger="input changed delay:300ms, search"
 						   hx-indicator="#search-loading" />
@@ -73,7 +73,7 @@ templ SiteListsTable(vm presenters.SiteListsVM) {
 									}
 								</td>
 								<td class="px-6 py-4 text-right">
-									<a href={ "/sites/" + fmt.Sprintf("%d", list.SiteID) + "/lists/" + list.ListID } 
+									<a href={ "/sites/" + fmt.Sprintf("%d", list.SiteID) + "/audit-runs/" + fmt.Sprintf("%d", vm.AuditRunID) + "/lists/" + list.ListID } 
 									   class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
 										View Details →
 									</a>

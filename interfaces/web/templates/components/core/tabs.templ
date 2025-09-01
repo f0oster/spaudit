@@ -2,11 +2,11 @@ package core
 
 import "fmt"
 
-templ Tabs(siteID int64, listID string, active string) {
+templ Tabs(siteID int64, auditRunID int64, listID string, active string) {
   <div class="border-b border-slate-200 flex gap-1 text-sm" role="tablist" aria-label="List content tabs">
     <button
       class={ "px-3 py-2 rounded-t hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset " + isActive(active, "overview") }
-      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/tabs/" + listID + "/overview" }
+      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/tabs/" + listID + "/overview" }
       hx-target="#tab-body"
       hx-swap="innerHTML"
       hx-push-url="true"
@@ -21,7 +21,7 @@ templ Tabs(siteID int64, listID string, active string) {
 
     <button
       class={ "px-3 py-2 rounded-t hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset " + isActive(active, "assignments") }
-      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/tabs/" + listID + "/assignments" }
+      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/tabs/" + listID + "/assignments" }
       hx-target="#tab-body"
       hx-swap="innerHTML"
       hx-push-url="true"
@@ -36,7 +36,7 @@ templ Tabs(siteID int64, listID string, active string) {
 
     <button
       class={ "px-3 py-2 rounded-t hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset " + isActive(active, "items") }
-      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/tabs/" + listID + "/items" }
+      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/tabs/" + listID + "/items" }
       hx-target="#tab-body"
       hx-swap="innerHTML"
       hx-push-url="true"
@@ -51,7 +51,7 @@ templ Tabs(siteID int64, listID string, active string) {
 
     <button
       class={ "px-3 py-2 rounded-t hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset " + isActive(active, "links") }
-      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/tabs/" + listID + "/links" }
+      hx-get={ "/sites/" + fmt.Sprintf("%d", siteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/tabs/" + listID + "/links" }
       hx-target="#tab-body"
       hx-swap="innerHTML"
       hx-push-url="true"

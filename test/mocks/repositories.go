@@ -274,13 +274,6 @@ func (m *MockAuditService) GetActiveAudits() []*audit.ActiveAudit {
 	return args.Get(0).([]*audit.ActiveAudit)
 }
 
-func (m *MockAuditService) GetAuditHistory(limit int) []*audit.AuditResult {
-	args := m.Called(limit)
-	if args.Get(0) == nil {
-		return nil
-	}
-	return args.Get(0).([]*audit.AuditResult)
-}
 
 func (m *MockAuditService) CancelAudit(siteURL string) error {
 	args := m.Called(siteURL)
@@ -405,16 +398,16 @@ func (m *MockSiteContentAggregateRepository) GetListsForSite(ctx context.Context
 	return args.Get(0).([]*sharepoint.List), args.Error(1)
 }
 
-func (m *MockSiteContentAggregateRepository) GetListAssignmentsWithRootCause(ctx context.Context, siteID int64, listID string) ([]*sharepoint.ResolvedAssignment, error) {
-	args := m.Called(ctx, siteID, listID)
+func (m *MockSiteContentAggregateRepository) GetListAssignmentsWithRootCause(ctx context.Context, siteID int64, auditRunID int64, listID string) ([]*sharepoint.ResolvedAssignment, error) {
+	args := m.Called(ctx, siteID, auditRunID, listID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*sharepoint.ResolvedAssignment), args.Error(1)
 }
 
-func (m *MockSiteContentAggregateRepository) GetAssignmentsForObject(ctx context.Context, siteID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error) {
-	args := m.Called(ctx, siteID, objectType, objectKey)
+func (m *MockSiteContentAggregateRepository) GetAssignmentsForObject(ctx context.Context, siteID int64, auditRunID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error) {
+	args := m.Called(ctx, siteID, auditRunID, objectType, objectKey)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -569,23 +562,23 @@ func (m *MockAuditRepository) SaveItemSensitivityLabel(ctx context.Context, labe
 	return args.Error(0)
 }
 
-func (m *MockAuditRepository) SaveSharingGovernance(ctx context.Context, siteID int64, sharingInfo *sharepoint.SharingInfo) error {
-	args := m.Called(ctx, siteID, sharingInfo)
+func (m *MockAuditRepository) SaveSharingGovernance(ctx context.Context, auditRunID, siteID int64, sharingInfo *sharepoint.SharingInfo) error {
+	args := m.Called(ctx, auditRunID, siteID, sharingInfo)
 	return args.Error(0)
 }
 
-func (m *MockAuditRepository) SaveSharingAbilities(ctx context.Context, siteID int64, abilities *sharepoint.SharingAbilities) error {
-	args := m.Called(ctx, siteID, abilities)
+func (m *MockAuditRepository) SaveSharingAbilities(ctx context.Context, auditRunID, siteID int64, abilities *sharepoint.SharingAbilities) error {
+	args := m.Called(ctx, auditRunID, siteID, abilities)
 	return args.Error(0)
 }
 
-func (m *MockAuditRepository) SaveRecipientLimits(ctx context.Context, siteID int64, limits *sharepoint.RecipientLimits) error {
-	args := m.Called(ctx, siteID, limits)
+func (m *MockAuditRepository) SaveRecipientLimits(ctx context.Context, auditRunID, siteID int64, limits *sharepoint.RecipientLimits) error {
+	args := m.Called(ctx, auditRunID, siteID, limits)
 	return args.Error(0)
 }
 
-func (m *MockAuditRepository) SaveSensitivityLabel(ctx context.Context, siteID int64, itemGUID string, label *sharepoint.SensitivityLabelInformation) error {
-	args := m.Called(ctx, siteID, itemGUID, label)
+func (m *MockAuditRepository) SaveSensitivityLabel(ctx context.Context, auditRunID, siteID int64, itemGUID string, label *sharepoint.SensitivityLabelInformation) error {
+	args := m.Called(ctx, auditRunID, siteID, itemGUID, label)
 	return args.Error(0)
 }
 

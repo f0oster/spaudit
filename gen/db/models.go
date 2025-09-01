@@ -46,6 +46,7 @@ type AuditRunEvent struct {
 type Item struct {
 	SiteID       int64          `json:"site_id"`
 	ItemGuid     string         `json:"item_guid"`
+	AuditRunID   int64          `json:"audit_run_id"`
 	ListID       string         `json:"list_id"`
 	ItemID       int64          `json:"item_id"`
 	ListItemGuid sql.NullString `json:"list_item_guid"`
@@ -58,7 +59,6 @@ type Item struct {
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	CreatedAt    sql.NullTime   `json:"created_at"`
 	ModifiedAt   sql.NullTime   `json:"modified_at"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
 }
 
 type Job struct {
@@ -80,6 +80,7 @@ type Job struct {
 type List struct {
 	SiteID       int64          `json:"site_id"`
 	ListID       string         `json:"list_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 	WebID        string         `json:"web_id"`
 	Title        string         `json:"title"`
 	BaseTemplate sql.NullInt64  `json:"base_template"`
@@ -88,22 +89,22 @@ type List struct {
 	HasUnique    sql.NullBool   `json:"has_unique"`
 	Hidden       sql.NullBool   `json:"hidden"`
 	CreatedAt    sql.NullTime   `json:"created_at"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
 }
 
 type Principal struct {
 	SiteID        int64          `json:"site_id"`
 	PrincipalID   int64          `json:"principal_id"`
+	AuditRunID    int64          `json:"audit_run_id"`
 	Title         sql.NullString `json:"title"`
 	LoginName     sql.NullString `json:"login_name"`
 	Email         sql.NullString `json:"email"`
 	PrincipalType int64          `json:"principal_type"`
 	CreatedAt     sql.NullTime   `json:"created_at"`
-	AuditRunID    sql.NullInt64  `json:"audit_run_id"`
 }
 
 type RecipientLimit struct {
 	SiteID                   int64          `json:"site_id"`
+	AuditRunID               int64          `json:"audit_run_id"`
 	CheckPermissions         sql.NullString `json:"check_permissions"`
 	GrantDirectAccess        sql.NullString `json:"grant_direct_access"`
 	ShareLink                sql.NullString `json:"share_link"`
@@ -113,29 +114,30 @@ type RecipientLimit struct {
 }
 
 type RoleAssignment struct {
-	SiteID      int64         `json:"site_id"`
-	ObjectType  string        `json:"object_type"`
-	ObjectKey   string        `json:"object_key"`
-	PrincipalID int64         `json:"principal_id"`
-	RoleDefID   int64         `json:"role_def_id"`
-	Inherited   sql.NullBool  `json:"inherited"`
-	CreatedAt   sql.NullTime  `json:"created_at"`
-	AuditRunID  sql.NullInt64 `json:"audit_run_id"`
+	SiteID      int64        `json:"site_id"`
+	ObjectType  string       `json:"object_type"`
+	ObjectKey   string       `json:"object_key"`
+	PrincipalID int64        `json:"principal_id"`
+	RoleDefID   int64        `json:"role_def_id"`
+	AuditRunID  int64        `json:"audit_run_id"`
+	Inherited   sql.NullBool `json:"inherited"`
+	CreatedAt   sql.NullTime `json:"created_at"`
 }
 
 type RoleDefinition struct {
 	SiteID          int64          `json:"site_id"`
 	RoleDefID       int64          `json:"role_def_id"`
+	AuditRunID      int64          `json:"audit_run_id"`
 	Name            string         `json:"name"`
 	Description     sql.NullString `json:"description"`
 	BasePermissions sql.NullInt64  `json:"base_permissions"`
 	CreatedAt       sql.NullTime   `json:"created_at"`
-	AuditRunID      sql.NullInt64  `json:"audit_run_id"`
 }
 
 type SensitivityLabel struct {
 	SiteID                         int64          `json:"site_id"`
 	ItemGuid                       string         `json:"item_guid"`
+	AuditRunID                     int64          `json:"audit_run_id"`
 	SensitivityLabelID             sql.NullString `json:"sensitivity_label_id"`
 	DisplayName                    sql.NullString `json:"display_name"`
 	Color                          sql.NullString `json:"color"`
@@ -156,6 +158,7 @@ type SensitivityLabel struct {
 
 type SharingAbility struct {
 	SiteID                     int64          `json:"site_id"`
+	AuditRunID                 int64          `json:"audit_run_id"`
 	CanStopSharing             sql.NullBool   `json:"can_stop_sharing"`
 	AnonymousLinkAbilities     sql.NullString `json:"anonymous_link_abilities"`
 	AnyoneLinkAbilities        sql.NullString `json:"anyone_link_abilities"`
@@ -168,6 +171,7 @@ type SharingAbility struct {
 
 type SharingGovernance struct {
 	SiteID                                 int64          `json:"site_id"`
+	AuditRunID                             int64          `json:"audit_run_id"`
 	TenantID                               sql.NullString `json:"tenant_id"`
 	TenantDisplayName                      sql.NullString `json:"tenant_display_name"`
 	SharepointSiteID                       sql.NullString `json:"sharepoint_site_id"`
@@ -187,6 +191,7 @@ type SharingGovernance struct {
 type SharingLink struct {
 	SiteID                            int64          `json:"site_id"`
 	LinkID                            string         `json:"link_id"`
+	AuditRunID                        int64          `json:"audit_run_id"`
 	ItemGuid                          sql.NullString `json:"item_guid"`
 	FileFolderUniqueID                sql.NullString `json:"file_folder_unique_id"`
 	Url                               sql.NullString `json:"url"`
@@ -226,23 +231,22 @@ type SharingLink struct {
 	ShareID                           sql.NullString `json:"share_id"`
 	ShareToken                        sql.NullString `json:"share_token"`
 	SharingLinkStatus                 sql.NullInt64  `json:"sharing_link_status"`
-	AuditRunID                        sql.NullInt64  `json:"audit_run_id"`
 }
 
 type SharingLinkInvitation struct {
-	SiteID     int64         `json:"site_id"`
-	LinkID     string        `json:"link_id"`
-	Email      string        `json:"email"`
-	CreatedAt  sql.NullTime  `json:"created_at"`
-	AuditRunID sql.NullInt64 `json:"audit_run_id"`
+	SiteID     int64        `json:"site_id"`
+	LinkID     string       `json:"link_id"`
+	Email      string       `json:"email"`
+	AuditRunID int64        `json:"audit_run_id"`
+	CreatedAt  sql.NullTime `json:"created_at"`
 }
 
 type SharingLinkMember struct {
-	SiteID      int64         `json:"site_id"`
-	LinkID      string        `json:"link_id"`
-	PrincipalID int64         `json:"principal_id"`
-	CreatedAt   sql.NullTime  `json:"created_at"`
-	AuditRunID  sql.NullInt64 `json:"audit_run_id"`
+	SiteID      int64        `json:"site_id"`
+	LinkID      string       `json:"link_id"`
+	PrincipalID int64        `json:"principal_id"`
+	AuditRunID  int64        `json:"audit_run_id"`
+	CreatedAt   sql.NullTime `json:"created_at"`
 }
 
 type Site struct {
@@ -256,11 +260,11 @@ type Site struct {
 type Web struct {
 	SiteID            int64          `json:"site_id"`
 	WebID             string         `json:"web_id"`
+	AuditRunID        int64          `json:"audit_run_id"`
 	Title             sql.NullString `json:"title"`
 	ServerRelativeUrl sql.NullString `json:"server_relative_url"`
 	Url               sql.NullString `json:"url"`
 	Template          sql.NullString `json:"template"`
 	HasUnique         sql.NullBool   `json:"has_unique"`
 	CreatedAt         sql.NullTime   `json:"created_at"`
-	AuditRunID        sql.NullInt64  `json:"audit_run_id"`
 }

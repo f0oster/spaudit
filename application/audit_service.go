@@ -9,6 +9,7 @@ import (
 	"spaudit/database"
 	"spaudit/domain/audit"
 	"spaudit/domain/jobs"
+	"spaudit/gen/db"
 	"spaudit/logging"
 )
 
@@ -18,12 +19,12 @@ type AuditService interface {
 	QueueAudit(ctx context.Context, siteURL string, parameters *audit.AuditParameters) (*audit.AuditRequest, error)
 	GetAuditStatus(siteURL string) (*audit.ActiveAudit, bool)
 	GetActiveAudits() []*audit.ActiveAudit
-	GetAuditHistory(limit int) []*audit.AuditResult
 	CancelAudit(siteURL string) error
 
 	// Methods needed by other services.
 	IsSiteBeingAudited(siteURL string) bool
 	BuildAuditParametersFromFormData(formData map[string][]string) *audit.AuditParameters
+	GetAuditRunsForSite(ctx context.Context, siteID int64, limit int) ([]*audit.AuditRun, error)
 }
 
 // AuditServiceImpl is the production implementation of AuditService using JobService for management.
@@ -217,45 +218,6 @@ func (s *AuditServiceImpl) GetActiveAudits() []*audit.ActiveAudit {
 	return activeAudits
 }
 
-// GetAuditHistory returns recent audit history
-func (s *AuditServiceImpl) GetAuditHistory(limit int) []*audit.AuditResult {
-	// Get completed, failed, and cancelled audit jobs
-	allJobs := s.jobService.ListAllJobs()
-	var auditResults []*audit.AuditResult
-
-	for _, job := range allJobs {
-		if job.Type == jobs.JobTypeSiteAudit &&
-			(job.Status == jobs.JobStatusCompleted || job.Status == jobs.JobStatusFailed || job.Status == jobs.JobStatusCancelled) {
-
-			duration := int64(0)
-			completedAt := time.Time{} // Default to zero time
-			if job.CompletedAt != nil {
-				duration = job.CompletedAt.Sub(job.StartedAt).Milliseconds()
-				completedAt = *job.CompletedAt
-			}
-
-			result := &audit.AuditResult{
-				RequestID:   job.ID,
-				SiteURL:     job.GetSiteURL(),
-				Status:      audit.AuditStatus(job.Status),
-				StartedAt:   job.StartedAt,
-				CompletedAt: completedAt,
-				Duration:    duration,
-				Error:       job.Error,
-				ItemsFound:  0, // Would need to enhance job to track these
-				ListsFound:  0,
-			}
-			auditResults = append(auditResults, result)
-		}
-	}
-
-	// Sort by completed time (most recent first) and limit
-	if len(auditResults) > limit {
-		auditResults = auditResults[:limit]
-	}
-
-	return auditResults
-}
 
 // CancelAudit cancels a running audit
 func (s *AuditServiceImpl) CancelAudit(siteURL string) error {
@@ -282,4 +244,42 @@ func (s *AuditServiceImpl) CancelAudit(siteURL string) error {
 
 	s.logger.Info("Audit cancelled", "site_url", siteURL, "job_id", targetJob.ID)
 	return nil
+}
+
+// GetAuditRunsForSite retrieves audit runs for a specific site
+func (s *AuditServiceImpl) GetAuditRunsForSite(ctx context.Context, siteID int64, limit int) ([]*audit.AuditRun, error) {
+	// Query database for audit runs
+	rows, err := s.db.Queries().GetAuditRunsForSite(ctx, db.GetAuditRunsForSiteParams{
+		SiteID:     siteID,
+		LimitCount: int64(limit),
+	})
+	if err != nil {
+		s.logger.Error("Failed to get audit runs for site", "site_id", siteID, "error", err)
+		return nil, fmt.Errorf("failed to get audit runs: %w", err)
+	}
+
+	// Convert to domain objects
+	auditRuns := make([]*audit.AuditRun, len(rows))
+	for i, row := range rows {
+		var completedAt *time.Time
+		if row.CompletedAt.Valid {
+			completedAt = &row.CompletedAt.Time
+		}
+
+		trigger := ""
+		if row.AuditTrigger.Valid {
+			trigger = row.AuditTrigger.String
+		}
+
+		auditRuns[i] = &audit.AuditRun{
+			ID:          row.AuditRunID,
+			JobID:       row.JobID,
+			SiteID:      row.SiteID,
+			StartedAt:   row.StartedAt,
+			CompletedAt: completedAt,
+			Trigger:     trigger,
+		}
+	}
+
+	return auditRuns, nil
 }

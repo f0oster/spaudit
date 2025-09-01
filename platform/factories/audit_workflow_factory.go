@@ -32,8 +32,8 @@ func NewAuditWorkflowFactory(db *database.Database) *AuditWorkflowFactory {
 	}
 }
 
-// CreateAuditWorkflow creates a fully configured audit workflow for the specified site
-func (f *AuditWorkflowFactory) CreateAuditWorkflow(siteURL string, parameters *audit.AuditParameters) (application.AuditWorkflow, error) {
+// CreateAuditWorkflow creates a fully configured audit workflow for the specified site and audit run
+func (f *AuditWorkflowFactory) CreateAuditWorkflow(siteURL string, auditRunID int64, parameters *audit.AuditParameters) (application.AuditWorkflow, error) {
 	f.logger.Info("Creating audit workflow", "siteURL", siteURL)
 
 	// Use default parameters if none provided
@@ -64,8 +64,8 @@ func (f *AuditWorkflowFactory) CreateAuditWorkflow(siteURL string, parameters *a
 
 	f.logger.Info("Found site for workflow", "site_url", siteURL, "site_id", site.ID)
 
-	// Create site-scoped SharePoint audit repository with the real site_id
-	sharepointAuditRepo := repositories.NewSharePointAuditRepository(baseRepo, site.ID, baseAuditRepo)
+	// Create site and audit-run scoped SharePoint audit repository
+	sharepointAuditRepo := repositories.NewSharePointAuditRepository(baseRepo, site.ID, auditRunID, baseAuditRepo)
 	f.logger.Info("Created repositories")
 
 	// Create other repositories

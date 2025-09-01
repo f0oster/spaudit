@@ -12,7 +12,6 @@ import (
 // PermissionAggregateRepositoryImpl implements the permission aggregate repository by composing entity repositories.
 type PermissionAggregateRepositoryImpl struct {
 	*BaseRepository
-	assignmentRepo     contracts.AssignmentRepository
 	itemRepo           contracts.ItemRepository
 	sharingRepo        contracts.SharingRepository
 	permissionsService *sharepoint.PermissionsService
@@ -22,13 +21,11 @@ type PermissionAggregateRepositoryImpl struct {
 // NewPermissionAggregateRepository creates a new permission aggregate repository.
 func NewPermissionAggregateRepository(
 	base *BaseRepository,
-	assignmentRepo contracts.AssignmentRepository,
 	itemRepo contracts.ItemRepository,
 	sharingRepo contracts.SharingRepository,
 ) contracts.PermissionAggregateRepository {
 	return &PermissionAggregateRepositoryImpl{
 		BaseRepository:     base,
-		assignmentRepo:     assignmentRepo,
 		itemRepo:           itemRepo,
 		sharingRepo:        sharingRepo,
 		permissionsService: sharepoint.NewPermissionsService(),
@@ -36,18 +33,22 @@ func NewPermissionAggregateRepository(
 	}
 }
 
-// GetPermissionAnalysisComponents retrieves raw components needed for permission analysis.
+// GetPermissionAnalysisComponents retrieves raw components needed for permission analysis (audit-scoped).
 func (r *PermissionAggregateRepositoryImpl) GetPermissionAnalysisComponents(
 	ctx context.Context,
 	siteID int64,
+	auditRunID int64,
 	list *sharepoint.List,
 ) (*contracts.PermissionAnalysisComponents, error) {
 	var components *contracts.PermissionAnalysisComponents
 
 	// Execute within a read transaction for consistency
 	err := r.WithReadTx(func(queries *db.Queries) error {
+		// Create audit-scoped assignment repository
+		scopedAssignmentRepo := NewScopedAssignmentRepository(r.BaseRepository, queries, siteID, auditRunID)
+		
 		// Get assignments for the list
-		assignments, err := r.assignmentRepo.GetAssignmentsForObject(ctx, siteID, "list", list.ID)
+		assignments, err := scopedAssignmentRepo.GetAssignmentsForObject(ctx, siteID, "list", list.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get assignments: %w", err)
 		}

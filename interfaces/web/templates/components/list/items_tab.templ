@@ -14,7 +14,7 @@ import (
 // - Consider infinite scroll as alternative for better UX
 // - Add total count display ("Showing 1-50 of 309 items")
 // - Add client-side filtering and sorting controls
-templ ListItemsTab(list presenters.ListSummary, items []presenters.ItemSummary) {
+templ ListItemsTab(list presenters.ListSummary, auditRunID int64, items []presenters.ItemSummary) {
 	if len(items) == 0 {
 		@ui.EmptyState("No Items Found", "This list doesn't contain any items, or items couldn't be retrieved.", "📋")
 	} else {
@@ -49,7 +49,7 @@ templ ListItemsTab(list presenters.ListSummary, items []presenters.ItemSummary) 
 							}
 						}
 						@ui.TableCell() {
-							@ui.ActionButton("Assignments", "/sites/" + fmt.Sprintf("%d", list.SiteID) + "/items/" + it.ItemGUID + "/assignments/toggle", "assign-row-" + it.ItemGUID, "primary")
+							@ui.ActionButton("Assignments", "/sites/" + fmt.Sprintf("%d", list.SiteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/items/" + it.ItemGUID + "/assignments/toggle", "assign-row-" + it.ItemGUID, "primary")
 						}
 					}
 					@ui.TableExpandableRow("assign-row-" + it.ItemGUID, true, "3") {

@@ -16,7 +16,7 @@ type ProgressCallback func(stage, description string, percentage, itemsDone, ite
 
 // WorkflowFactory defines the interface for creating workflows
 type WorkflowFactory interface {
-	CreateAuditWorkflow(siteURL string, parameters *audit.AuditParameters) (AuditWorkflow, error)
+	CreateAuditWorkflow(siteURL string, auditRunID int64, parameters *audit.AuditParameters) (AuditWorkflow, error)
 }
 
 // AuditWorkflow defines the interface for audit workflow operations

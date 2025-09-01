@@ -113,12 +113,28 @@ func (r *SqlcJobRepository) UpdateJobStatus(ctx context.Context, jobID string, s
 	})
 }
 
-// CompleteJob marks a job as completed with a result
+// CompleteJob marks a job as completed with a result and completes any associated audit run
 func (r *SqlcJobRepository) CompleteJob(ctx context.Context, jobID string, result string) error {
-	return r.WriteQueries().CompleteJob(ctx, db.CompleteJobParams{
+	queries := r.WriteQueries()
+	
+	// Complete the job
+	err := queries.CompleteJob(ctx, db.CompleteJobParams{
 		JobID:  jobID,
 		Result: sql.NullString{String: result, Valid: result != ""},
 	})
+	if err != nil {
+		return err
+	}
+	
+	// Also complete any associated audit run
+	err = queries.CompleteAuditRunByJobID(ctx, jobID)
+	if err != nil {
+		// Don't fail job completion if audit run completion fails
+		// This handles cases where job might not have an associated audit run
+		// TODO: Add proper logging
+	}
+	
+	return nil
 }
 
 // FailJob marks a job as failed with an error message
@@ -215,10 +231,7 @@ func (r *SqlcJobRepository) UpdateJob(ctx context.Context, job *jobs.Job) error 
 
 	// If the job is completed or failed, use the specific completion methods
 	if job.Status == jobs.JobStatusCompleted && job.Result != "" {
-		return r.WriteQueries().CompleteJob(ctx, db.CompleteJobParams{
-			JobID:  job.ID,
-			Result: sql.NullString{String: job.Result, Valid: true},
-		})
+		return r.CompleteJob(ctx, job.ID, job.Result)
 	}
 
 	if job.Status == jobs.JobStatusFailed && job.Error != "" {

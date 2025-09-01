@@ -26,23 +26,25 @@ func (q *Queries) DeleteRoleAssignmentsForObject(ctx context.Context, arg Delete
 	return err
 }
 
-const getAssignmentsForObject = `-- name: GetAssignmentsForObject :many
+const getAssignmentsForObjectByAuditRun = `-- name: GetAssignmentsForObjectByAuditRun :many
 SELECT ra.principal_id, p.title AS principal_title, p.login_name, p.principal_type,
        ra.role_def_id, rd.name AS role_name, rd.description, ra.inherited
 FROM role_assignments ra
-JOIN principals p ON p.site_id = ra.site_id AND p.principal_id = ra.principal_id
-JOIN role_definitions rd ON rd.site_id = ra.site_id AND rd.role_def_id = ra.role_def_id
+JOIN principals p ON p.site_id = ra.site_id AND p.principal_id = ra.principal_id AND p.audit_run_id = ra.audit_run_id
+JOIN role_definitions rd ON rd.site_id = ra.site_id AND rd.role_def_id = ra.role_def_id AND rd.audit_run_id = ra.audit_run_id
 WHERE ra.site_id = ?1 AND ra.object_type = ?2 AND ra.object_key = ?3
+  AND ra.audit_run_id = ?4
 ORDER BY principal_title, role_name
 `
 
-type GetAssignmentsForObjectParams struct {
+type GetAssignmentsForObjectByAuditRunParams struct {
 	SiteID     int64  `json:"site_id"`
 	ObjectType string `json:"object_type"`
 	ObjectKey  string `json:"object_key"`
+	AuditRunID int64  `json:"audit_run_id"`
 }
 
-type GetAssignmentsForObjectRow struct {
+type GetAssignmentsForObjectByAuditRunRow struct {
 	PrincipalID    int64          `json:"principal_id"`
 	PrincipalTitle sql.NullString `json:"principal_title"`
 	LoginName      sql.NullString `json:"login_name"`
@@ -53,15 +55,20 @@ type GetAssignmentsForObjectRow struct {
 	Inherited      sql.NullBool   `json:"inherited"`
 }
 
-func (q *Queries) GetAssignmentsForObject(ctx context.Context, arg GetAssignmentsForObjectParams) ([]GetAssignmentsForObjectRow, error) {
-	rows, err := q.db.QueryContext(ctx, getAssignmentsForObject, arg.SiteID, arg.ObjectType, arg.ObjectKey)
+func (q *Queries) GetAssignmentsForObjectByAuditRun(ctx context.Context, arg GetAssignmentsForObjectByAuditRunParams) ([]GetAssignmentsForObjectByAuditRunRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAssignmentsForObjectByAuditRun,
+		arg.SiteID,
+		arg.ObjectType,
+		arg.ObjectKey,
+		arg.AuditRunID,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetAssignmentsForObjectRow
+	var items []GetAssignmentsForObjectByAuditRunRow
 	for rows.Next() {
-		var i GetAssignmentsForObjectRow
+		var i GetAssignmentsForObjectByAuditRunRow
 		if err := rows.Scan(
 			&i.PrincipalID,
 			&i.PrincipalTitle,
@@ -85,7 +92,7 @@ func (q *Queries) GetAssignmentsForObject(ctx context.Context, arg GetAssignment
 	return items, nil
 }
 
-const getRootPermissionsForPrincipalInWeb = `-- name: GetRootPermissionsForPrincipalInWeb :many
+const getRootPermissionsForPrincipalInWebByAuditRun = `-- name: GetRootPermissionsForPrincipalInWebByAuditRun :many
 SELECT ra.object_type, ra.object_key, rd.name as role_name,
        CASE ra.object_type
          WHEN 'list' THEN l.title
@@ -93,12 +100,12 @@ SELECT ra.object_type, ra.object_key, rd.name as role_name,
          WHEN 'item' THEN i.name
        END as object_name
 FROM role_assignments ra
-JOIN role_definitions rd ON ra.site_id = rd.site_id AND ra.role_def_id = rd.role_def_id
-LEFT JOIN lists l ON ra.object_type = 'list' AND ra.site_id = l.site_id AND ra.object_key = l.list_id AND l.web_id = ?1
-LEFT JOIN webs w ON ra.object_type = 'web' AND ra.site_id = w.site_id AND ra.object_key = w.web_id AND w.web_id = ?1
-LEFT JOIN items i ON ra.object_type = 'item' AND ra.site_id = i.site_id AND ra.object_key = i.item_guid
-LEFT JOIN lists parent_list ON i.site_id = parent_list.site_id AND i.list_id = parent_list.list_id AND parent_list.web_id = ?1
-WHERE ra.site_id = ?2 AND ra.principal_id = ?3
+JOIN role_definitions rd ON ra.site_id = rd.site_id AND ra.role_def_id = rd.role_def_id AND rd.audit_run_id = ra.audit_run_id
+LEFT JOIN lists l ON ra.object_type = 'list' AND ra.site_id = l.site_id AND ra.object_key = l.list_id AND l.web_id = ?1 AND l.audit_run_id = ra.audit_run_id
+LEFT JOIN webs w ON ra.object_type = 'web' AND ra.site_id = w.site_id AND ra.object_key = w.web_id AND w.web_id = ?1 AND w.audit_run_id = ra.audit_run_id
+LEFT JOIN items i ON ra.object_type = 'item' AND ra.site_id = i.site_id AND ra.object_key = i.item_guid AND i.audit_run_id = ra.audit_run_id
+LEFT JOIN lists parent_list ON i.site_id = parent_list.site_id AND i.list_id = parent_list.list_id AND parent_list.web_id = ?1 AND parent_list.audit_run_id = ra.audit_run_id
+WHERE ra.site_id = ?2 AND ra.principal_id = ?3 AND ra.audit_run_id = ?4
   AND rd.name NOT LIKE '%Limited%'
   AND (
     (ra.object_type = 'web' AND w.site_id = ?2 AND w.web_id = ?1)
@@ -107,28 +114,34 @@ WHERE ra.site_id = ?2 AND ra.principal_id = ?3
   )
 `
 
-type GetRootPermissionsForPrincipalInWebParams struct {
+type GetRootPermissionsForPrincipalInWebByAuditRunParams struct {
 	WebID       string `json:"web_id"`
 	SiteID      int64  `json:"site_id"`
 	PrincipalID int64  `json:"principal_id"`
+	AuditRunID  int64  `json:"audit_run_id"`
 }
 
-type GetRootPermissionsForPrincipalInWebRow struct {
+type GetRootPermissionsForPrincipalInWebByAuditRunRow struct {
 	ObjectType string      `json:"object_type"`
 	ObjectKey  string      `json:"object_key"`
 	RoleName   string      `json:"role_name"`
 	ObjectName interface{} `json:"object_name"`
 }
 
-func (q *Queries) GetRootPermissionsForPrincipalInWeb(ctx context.Context, arg GetRootPermissionsForPrincipalInWebParams) ([]GetRootPermissionsForPrincipalInWebRow, error) {
-	rows, err := q.db.QueryContext(ctx, getRootPermissionsForPrincipalInWeb, arg.WebID, arg.SiteID, arg.PrincipalID)
+func (q *Queries) GetRootPermissionsForPrincipalInWebByAuditRun(ctx context.Context, arg GetRootPermissionsForPrincipalInWebByAuditRunParams) ([]GetRootPermissionsForPrincipalInWebByAuditRunRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRootPermissionsForPrincipalInWebByAuditRun,
+		arg.WebID,
+		arg.SiteID,
+		arg.PrincipalID,
+		arg.AuditRunID,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetRootPermissionsForPrincipalInWebRow
+	var items []GetRootPermissionsForPrincipalInWebByAuditRunRow
 	for rows.Next() {
-		var i GetRootPermissionsForPrincipalInWebRow
+		var i GetRootPermissionsForPrincipalInWebByAuditRunRow
 		if err := rows.Scan(
 			&i.ObjectType,
 			&i.ObjectKey,
@@ -213,7 +226,7 @@ type InsertPrincipalParams struct {
 	Title         sql.NullString `json:"title"`
 	LoginName     sql.NullString `json:"login_name"`
 	Email         sql.NullString `json:"email"`
-	AuditRunID    sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID    int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) InsertPrincipal(ctx context.Context, arg InsertPrincipalParams) error {
@@ -235,13 +248,13 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
 `
 
 type InsertRoleAssignmentParams struct {
-	SiteID      int64         `json:"site_id"`
-	ObjectType  string        `json:"object_type"`
-	ObjectKey   string        `json:"object_key"`
-	PrincipalID int64         `json:"principal_id"`
-	RoleDefID   int64         `json:"role_def_id"`
-	Inherited   sql.NullBool  `json:"inherited"`
-	AuditRunID  sql.NullInt64 `json:"audit_run_id"`
+	SiteID      int64        `json:"site_id"`
+	ObjectType  string       `json:"object_type"`
+	ObjectKey   string       `json:"object_key"`
+	PrincipalID int64        `json:"principal_id"`
+	RoleDefID   int64        `json:"role_def_id"`
+	Inherited   sql.NullBool `json:"inherited"`
+	AuditRunID  int64        `json:"audit_run_id"`
 }
 
 func (q *Queries) InsertRoleAssignment(ctx context.Context, arg InsertRoleAssignmentParams) error {
@@ -267,7 +280,7 @@ type InsertRoleDefinitionParams struct {
 	RoleDefID   int64          `json:"role_def_id"`
 	Name        string         `json:"name"`
 	Description sql.NullString `json:"description"`
-	AuditRunID  sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID  int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) InsertRoleDefinition(ctx context.Context, arg InsertRoleDefinitionParams) error {

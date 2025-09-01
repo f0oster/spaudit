@@ -32,55 +32,6 @@ func NewJobHandlers(
 	}
 }
 
-// StartAudit starts an audit job using the registry pattern
-func (h *JobHandlers) StartAudit(w http.ResponseWriter, r *http.Request) {
-	siteURL := r.FormValue("site_url")
-
-	if siteURL == "" {
-		http.Error(w, "missing site_url", http.StatusBadRequest)
-		return
-	}
-
-	// Parse form data
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
-		return
-	}
-
-	// Prepare job parameters
-	params := application.JobParams{
-		"siteURL":     siteURL,
-		"description": "Site audit for " + siteURL,
-	}
-
-	// Add form parameters for audit configuration
-	for key, values := range r.Form {
-		if len(values) > 0 {
-			params[key] = values[0]
-		}
-	}
-
-	// Start audit job using registry pattern
-	job, err := h.jobService.StartJob(jobs.JobTypeSiteAudit, params)
-	if err != nil {
-		h.logger.Error("Failed to start audit job", "site_url", siteURL, "error", err)
-
-		// Use presenter to format error message
-		errorMessage := h.jobPresenter.FormatAuditQueuedErrorMessage(err)
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(errorMessage))
-		return
-	}
-
-	h.logger.Info("Audit job started successfully",
-		"job_id", job.ID,
-		"site_url", siteURL)
-
-	// Use presenter to format success message
-	successMessage := h.jobPresenter.FormatAuditQueuedSuccessMessage()
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(successMessage))
-}
 
 // CancelJob cancels a running job - thin orchestration with business logic in service
 func (h *JobHandlers) CancelJob(w http.ResponseWriter, r *http.Request) {
@@ -151,33 +102,6 @@ func (h *JobHandlers) handleJobListJSON(w http.ResponseWriter, r *http.Request, 
 	jobListView := h.jobPresenter.FormatJobList(jobs)
 	if err := json.NewEncoder(w).Encode(jobListView); err != nil {
 		h.logger.Error("Failed to encode job list response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
-}
-
-// GetJobStatus returns the current status of a job
-func (h *JobHandlers) GetJobStatus(w http.ResponseWriter, r *http.Request) {
-	jobID := chi.URLParam(r, "jobID")
-	if jobID == "" {
-		http.Error(w, "missing job ID", http.StatusBadRequest)
-		return
-	}
-
-	// Get job status using service
-	job, exists := h.jobService.GetJob(jobID)
-
-	w.Header().Set("Content-Type", "application/json")
-
-	if !exists {
-		jobView := h.jobPresenter.FormatJobNotFound()
-		json.NewEncoder(w).Encode(jobView)
-		return
-	}
-
-	// Use presenter to format job data
-	jobView := h.jobPresenter.FormatJobStatus(job)
-	if err := json.NewEncoder(w).Encode(jobView); err != nil {
-		h.logger.Error("Failed to encode job status response", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

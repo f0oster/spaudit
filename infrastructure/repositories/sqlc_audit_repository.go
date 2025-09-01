@@ -64,7 +64,7 @@ func (r *SqlcAuditRepository) SaveWeb(ctx context.Context, auditRunID int64, web
 		Title:      r.ToNullString(web.Title),
 		Template:   r.ToNullString(web.Template),
 		HasUnique:  r.ToNullBool(web.HasUnique),
-		AuditRunID: sql.NullInt64{Int64: auditRunID, Valid: true},
+		AuditRunID: auditRunID,
 	})
 }
 
@@ -80,7 +80,7 @@ func (r *SqlcAuditRepository) SaveList(ctx context.Context, auditRunID int64, li
 		BaseTemplate: r.ToNullInt64(int64(list.BaseTemplate)),
 		ItemCount:    r.ToNullInt64(int64(list.ItemCount)),
 		HasUnique:    r.ToNullBool(list.HasUnique),
-		AuditRunID:   sql.NullInt64{Int64: auditRunID, Valid: true},
+		AuditRunID:   auditRunID,
 	})
 }
 
@@ -97,7 +97,7 @@ func (r *SqlcAuditRepository) SaveItem(ctx context.Context, auditRunID int64, it
 		IsFolder:     r.ToNullBool(item.IsFolder),
 		HasUnique:    r.ToNullBool(item.HasUnique),
 		Name:         r.ToNullString(item.Name),
-		AuditRunID:   sql.NullInt64{Int64: auditRunID, Valid: true},
+		AuditRunID:   auditRunID,
 	})
 }
 
@@ -109,7 +109,7 @@ func (r *SqlcAuditRepository) SaveRoleDefinitions(ctx context.Context, auditRunI
 			RoleDefID:   rd.ID,
 			Name:        rd.Name,
 			Description: r.ToNullString(rd.Description),
-			AuditRunID:  sql.NullInt64{Int64: auditRunID, Valid: true},
+			AuditRunID:  auditRunID,
 		}); err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func (r *SqlcAuditRepository) SavePrincipal(ctx context.Context, auditRunID int6
 		Title:         r.ToNullString(strings.TrimSpace(principal.Title)),
 		LoginName:     r.ToNullString(principal.LoginName),
 		Email:         r.ToNullString(principal.Email),
-		AuditRunID:    sql.NullInt64{Int64: auditRunID, Valid: true},
+		AuditRunID:    auditRunID,
 	})
 	
 	// Ignore duplicate principal within same audit run (UNIQUE constraint on site_id, principal_id, audit_run_id)
@@ -147,7 +147,7 @@ func (r *SqlcAuditRepository) SaveRoleAssignments(ctx context.Context, auditRunI
 			PrincipalID: assignment.PrincipalID,
 			RoleDefID:   assignment.RoleDefID,
 			Inherited:   r.ToNullBool(assignment.Inherited),
-			AuditRunID:  sql.NullInt64{Int64: auditRunID, Valid: true},
+			AuditRunID:  auditRunID,
 		}); err != nil {
 			return err
 		}
@@ -244,7 +244,7 @@ func (r *SqlcAuditRepository) SaveSharingLinks(ctx context.Context, auditRunID i
 			ShareID:                           r.ToNullString(link.ShareID),
 			ShareToken:                        r.ToNullString(link.ShareToken),
 			SharingLinkStatus:                 r.intPtrToNullInt64(link.SharingLinkStatus),
-			AuditRunID:                        sql.NullInt64{Int64: auditRunID, Valid: true},
+			AuditRunID:                        auditRunID,
 		})
 		if err != nil {
 			return fmt.Errorf("save sharing link: %w", err)
@@ -272,7 +272,7 @@ func (r *SqlcAuditRepository) SaveSharingLinks(ctx context.Context, auditRunID i
 				SiteID:      siteID,
 				LinkID:      linkID,
 				PrincipalID: member.ID,
-				AuditRunID:  sql.NullInt64{Int64: auditRunID, Valid: true},
+				AuditRunID:  auditRunID,
 			}); err != nil {
 				return fmt.Errorf("add member to link: %w", err)
 			}
@@ -413,7 +413,7 @@ func (r *SqlcAuditRepository) intPtrToNullInt64(value *int) sql.NullInt64 {
 }
 
 // SaveSharingGovernance persists site-level sharing governance data
-func (r *SqlcAuditRepository) SaveSharingGovernance(ctx context.Context, siteID int64, sharingInfo *sharepoint.SharingInfo) error {
+func (r *SqlcAuditRepository) SaveSharingGovernance(ctx context.Context, auditRunID, siteID int64, sharingInfo *sharepoint.SharingInfo) error {
 	if sharingInfo == nil {
 		return nil // No governance data to save
 	}
@@ -427,6 +427,7 @@ func (r *SqlcAuditRepository) SaveSharingGovernance(ctx context.Context, siteID 
 
 	return r.WriteQueries().UpsertSharingGovernance(ctx, db.UpsertSharingGovernanceParams{
 		SiteID:                                 siteID,
+		AuditRunID:                             auditRunID,
 		TenantID:                               r.ToNullString(sharingInfo.TenantID),
 		TenantDisplayName:                      r.ToNullString(sharingInfo.TenantDisplayName),
 		SharepointSiteID:                       r.ToNullString(sharingInfo.SharePointSiteID),
@@ -443,7 +444,7 @@ func (r *SqlcAuditRepository) SaveSharingGovernance(ctx context.Context, siteID 
 }
 
 // SaveSharingAbilities persists site-level sharing abilities data as JSON
-func (r *SqlcAuditRepository) SaveSharingAbilities(ctx context.Context, siteID int64, abilities *sharepoint.SharingAbilities) error {
+func (r *SqlcAuditRepository) SaveSharingAbilities(ctx context.Context, auditRunID, siteID int64, abilities *sharepoint.SharingAbilities) error {
 	if abilities == nil {
 		return nil // No abilities data to save
 	}
@@ -457,6 +458,7 @@ func (r *SqlcAuditRepository) SaveSharingAbilities(ctx context.Context, siteID i
 
 	return r.WriteQueries().UpsertSharingAbilities(ctx, db.UpsertSharingAbilitiesParams{
 		SiteID:                     siteID,
+		AuditRunID:                 auditRunID,
 		CanStopSharing:             r.ToNullBool(abilities.CanStopSharing),
 		AnonymousLinkAbilities:     r.ToNullString(string(anonymousJSON)),
 		AnyoneLinkAbilities:        r.ToNullString(string(anyoneJSON)),
@@ -467,7 +469,7 @@ func (r *SqlcAuditRepository) SaveSharingAbilities(ctx context.Context, siteID i
 }
 
 // SaveRecipientLimits persists recipient limits data as JSON
-func (r *SqlcAuditRepository) SaveRecipientLimits(ctx context.Context, siteID int64, limits *sharepoint.RecipientLimits) error {
+func (r *SqlcAuditRepository) SaveRecipientLimits(ctx context.Context, auditRunID, siteID int64, limits *sharepoint.RecipientLimits) error {
 	if limits == nil {
 		return nil // No limits data to save
 	}
@@ -480,6 +482,7 @@ func (r *SqlcAuditRepository) SaveRecipientLimits(ctx context.Context, siteID in
 
 	return r.WriteQueries().UpsertRecipientLimits(ctx, db.UpsertRecipientLimitsParams{
 		SiteID:                   siteID,
+		AuditRunID:               auditRunID,
 		CheckPermissions:         r.ToNullString(string(checkPermJSON)),
 		GrantDirectAccess:        r.ToNullString(string(grantAccessJSON)),
 		ShareLink:                r.ToNullString(string(shareLinkJSON)),
@@ -488,7 +491,7 @@ func (r *SqlcAuditRepository) SaveRecipientLimits(ctx context.Context, siteID in
 }
 
 // SaveSensitivityLabel persists sharing-related sensitivity label data (legacy format)
-func (r *SqlcAuditRepository) SaveSensitivityLabel(ctx context.Context, siteID int64, itemGUID string, label *sharepoint.SensitivityLabelInformation) error {
+func (r *SqlcAuditRepository) SaveSensitivityLabel(ctx context.Context, auditRunID, siteID int64, itemGUID string, label *sharepoint.SensitivityLabelInformation) error {
 	if label == nil {
 		return nil // No label data to save
 	}
@@ -496,6 +499,7 @@ func (r *SqlcAuditRepository) SaveSensitivityLabel(ctx context.Context, siteID i
 	return r.WriteQueries().UpsertSensitivityLabel(ctx, db.UpsertSensitivityLabelParams{
 		SiteID:                         siteID,
 		ItemGuid:                       itemGUID,
+		AuditRunID:                     auditRunID,
 		SensitivityLabelID:             r.ToNullString(label.ID),
 		DisplayName:                    r.ToNullString(label.DisplayName),
 		Color:                          r.ToNullString(label.Color),

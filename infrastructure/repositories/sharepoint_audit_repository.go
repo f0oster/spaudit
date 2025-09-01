@@ -7,22 +7,25 @@ import (
 	"spaudit/domain/sharepoint"
 )
 
-// SharePointAuditRepositoryImpl provides audit operations scoped to a specific SharePoint site.
+// SharePointAuditRepositoryImpl provides audit operations scoped to a specific SharePoint site and audit run.
 type SharePointAuditRepositoryImpl struct {
 	*BaseRepository
-	siteID    int64
-	auditRepo contracts.AuditRepository
+	siteID     int64
+	auditRunID int64
+	auditRepo  contracts.AuditRepository
 }
 
-// NewSharePointAuditRepository creates a repository that automatically applies site ID to all operations.
+// NewSharePointAuditRepository creates a repository that automatically applies site ID and audit run ID to all operations.
 func NewSharePointAuditRepository(
 	base *BaseRepository,
 	siteID int64,
+	auditRunID int64,
 	auditRepo contracts.AuditRepository,
 ) contracts.SharePointAuditRepository {
 	return &SharePointAuditRepositoryImpl{
 		BaseRepository: base,
 		siteID:         siteID,
+		auditRunID:     auditRunID,
 		auditRepo:      auditRepo,
 	}
 }
@@ -32,22 +35,15 @@ func (r *SharePointAuditRepositoryImpl) GetSiteID() int64 {
 	return r.siteID
 }
 
-// SaveSite persists a site with site ID validation.
+// GetAuditRunID returns the audit run ID this repository is scoped to.
+func (r *SharePointAuditRepositoryImpl) GetAuditRunID() int64 {
+	return r.auditRunID
+}
+
+// SaveSite persists a site with automatic site ID assignment.
 func (r *SharePointAuditRepositoryImpl) SaveSite(ctx context.Context, site *sharepoint.Site) error {
-	// Handle the case where we're updating a placeholder site with real SharePoint data
-	if site.ID == 0 {
-		// New site being saved - set it to our scoped site ID
-		site.ID = r.siteID
-	} else if site.ID != r.siteID {
-		// Site has a different ID than our scope - this is a safety check
-		// Only allow if our scope is 0 (placeholder) or IDs match
-		if r.siteID != 0 {
-			return ErrSiteMismatch{Expected: r.siteID, Actual: site.ID}
-		}
-		// If our scope is 0, don't mutate the repository's siteID field
-		// as this creates thread-safety issues with concurrent jobs
-		// The repository should remain immutable after creation
-	}
+	// Always ensure the site has our scoped site ID
+	site.ID = r.siteID
 	return r.auditRepo.SaveSite(ctx, site)
 }
 
@@ -56,46 +52,49 @@ func (r *SharePointAuditRepositoryImpl) GetSiteByURL(ctx context.Context, siteUR
 	return r.auditRepo.GetSiteByURL(ctx, siteURL)
 }
 
-// SaveWeb persists a web with automatic site ID assignment.
-func (r *SharePointAuditRepositoryImpl) SaveWeb(ctx context.Context, auditRunID int64, web *sharepoint.Web) error {
+// SaveWeb persists a web with automatic site ID and audit run ID assignment.
+func (r *SharePointAuditRepositoryImpl) SaveWeb(ctx context.Context, web *sharepoint.Web) error {
 	web.SiteID = r.siteID
-	return r.auditRepo.SaveWeb(ctx, auditRunID, web)
+	web.AuditRunID = &r.auditRunID
+	return r.auditRepo.SaveWeb(ctx, r.auditRunID, web)
 }
 
-// SaveList persists a list with automatic site ID assignment.
-func (r *SharePointAuditRepositoryImpl) SaveList(ctx context.Context, auditRunID int64, list *sharepoint.List) error {
+// SaveList persists a list with automatic site ID and audit run ID assignment.
+func (r *SharePointAuditRepositoryImpl) SaveList(ctx context.Context, list *sharepoint.List) error {
 	list.SiteID = r.siteID
-	return r.auditRepo.SaveList(ctx, auditRunID, list)
+	list.AuditRunID = &r.auditRunID
+	return r.auditRepo.SaveList(ctx, r.auditRunID, list)
 }
 
-// SaveItem persists an item with automatic site ID assignment.
-func (r *SharePointAuditRepositoryImpl) SaveItem(ctx context.Context, auditRunID int64, item *sharepoint.Item) error {
+// SaveItem persists an item with automatic site ID and audit run ID assignment.
+func (r *SharePointAuditRepositoryImpl) SaveItem(ctx context.Context, item *sharepoint.Item) error {
 	item.SiteID = r.siteID
-	return r.auditRepo.SaveItem(ctx, auditRunID, item)
+	item.AuditRunID = &r.auditRunID
+	return r.auditRepo.SaveItem(ctx, r.auditRunID, item)
 }
 
 // SaveRoleDefinitions persists role definitions with automatic site ID assignment.
-func (r *SharePointAuditRepositoryImpl) SaveRoleDefinitions(ctx context.Context, auditRunID int64, roleDefs []*sharepoint.RoleDefinition) error {
+func (r *SharePointAuditRepositoryImpl) SaveRoleDefinitions(ctx context.Context, roleDefs []*sharepoint.RoleDefinition) error {
 	// Apply site ID to all role definitions
 	for _, roleDef := range roleDefs {
 		roleDef.SiteID = r.siteID
 	}
-	return r.auditRepo.SaveRoleDefinitions(ctx, auditRunID, r.siteID, roleDefs)
+	return r.auditRepo.SaveRoleDefinitions(ctx, r.auditRunID, r.siteID, roleDefs)
 }
 
 // SavePrincipal persists a principal with automatic site ID assignment.
-func (r *SharePointAuditRepositoryImpl) SavePrincipal(ctx context.Context, auditRunID int64, principal *sharepoint.Principal) error {
+func (r *SharePointAuditRepositoryImpl) SavePrincipal(ctx context.Context, principal *sharepoint.Principal) error {
 	principal.SiteID = r.siteID
-	return r.auditRepo.SavePrincipal(ctx, auditRunID, principal)
+	return r.auditRepo.SavePrincipal(ctx, r.auditRunID, principal)
 }
 
 // SaveRoleAssignments persists role assignments with automatic site ID assignment.
-func (r *SharePointAuditRepositoryImpl) SaveRoleAssignments(ctx context.Context, auditRunID int64, assignments []*sharepoint.RoleAssignment) error {
+func (r *SharePointAuditRepositoryImpl) SaveRoleAssignments(ctx context.Context, assignments []*sharepoint.RoleAssignment) error {
 	// Apply site ID to all assignments
 	for _, assignment := range assignments {
 		assignment.SiteID = r.siteID
 	}
-	return r.auditRepo.SaveRoleAssignments(ctx, auditRunID, r.siteID, assignments)
+	return r.auditRepo.SaveRoleAssignments(ctx, r.auditRunID, r.siteID, assignments)
 }
 
 // ClearRoleAssignments clears role assignments for an object using the scoped site ID.
@@ -104,7 +103,7 @@ func (r *SharePointAuditRepositoryImpl) ClearRoleAssignments(ctx context.Context
 }
 
 // SaveSharingLinks persists sharing links with automatic site ID assignment.
-func (r *SharePointAuditRepositoryImpl) SaveSharingLinks(ctx context.Context, auditRunID int64, links []*sharepoint.SharingLink) error {
+func (r *SharePointAuditRepositoryImpl) SaveSharingLinks(ctx context.Context, links []*sharepoint.SharingLink) error {
 	// Apply site ID to all links and their nested principals
 	for _, link := range links {
 		link.SiteID = r.siteID
@@ -120,7 +119,7 @@ func (r *SharePointAuditRepositoryImpl) SaveSharingLinks(ctx context.Context, au
 			member.SiteID = r.siteID
 		}
 	}
-	return r.auditRepo.SaveSharingLinks(ctx, auditRunID, r.siteID, links)
+	return r.auditRepo.SaveSharingLinks(ctx, r.auditRunID, r.siteID, links)
 }
 
 // ClearSharingLinks clears sharing links for an item using the scoped site ID.
@@ -155,22 +154,22 @@ func (r *SharePointAuditRepositoryImpl) GetItemByListAndID(ctx context.Context, 
 
 // SaveSharingGovernance persists sharing governance data using the scoped site ID.
 func (r *SharePointAuditRepositoryImpl) SaveSharingGovernance(ctx context.Context, sharingInfo *sharepoint.SharingInfo) error {
-	return r.auditRepo.SaveSharingGovernance(ctx, r.siteID, sharingInfo)
+	return r.auditRepo.SaveSharingGovernance(ctx, r.auditRunID, r.siteID, sharingInfo)
 }
 
 // SaveSharingAbilities persists sharing abilities data using the scoped site ID.
 func (r *SharePointAuditRepositoryImpl) SaveSharingAbilities(ctx context.Context, abilities *sharepoint.SharingAbilities) error {
-	return r.auditRepo.SaveSharingAbilities(ctx, r.siteID, abilities)
+	return r.auditRepo.SaveSharingAbilities(ctx, r.auditRunID, r.siteID, abilities)
 }
 
 // SaveRecipientLimits persists recipient limits data using the scoped site ID.
 func (r *SharePointAuditRepositoryImpl) SaveRecipientLimits(ctx context.Context, limits *sharepoint.RecipientLimits) error {
-	return r.auditRepo.SaveRecipientLimits(ctx, r.siteID, limits)
+	return r.auditRepo.SaveRecipientLimits(ctx, r.auditRunID, r.siteID, limits)
 }
 
 // SaveSensitivityLabel persists sharing-related sensitivity label data using the scoped site ID.
 func (r *SharePointAuditRepositoryImpl) SaveSensitivityLabel(ctx context.Context, itemGUID string, label *sharepoint.SensitivityLabelInformation) error {
-	return r.auditRepo.SaveSensitivityLabel(ctx, r.siteID, itemGUID, label)
+	return r.auditRepo.SaveSensitivityLabel(ctx, r.auditRunID, r.siteID, itemGUID, label)
 }
 
 // SaveItemSensitivityLabel persists item-level sensitivity label data with automatic site ID assignment.

@@ -10,6 +10,13 @@ import (
 	"spaudit/domain/sharepoint"
 )
 
+// AuditRunOption represents an audit run option for UI selection
+type AuditRunOption struct {
+	ID        int64     `json:"id"`
+	StartedAt time.Time `json:"started_at"`
+	Status    string    `json:"status"`
+}
+
 // SiteListsVM is the view model for the site lists page
 type SiteListsVM struct {
 	Site            SiteWithMetadata
@@ -17,6 +24,8 @@ type SiteListsVM struct {
 	TotalLists      int
 	ListsWithUnique int
 	TotalItems      int
+	AuditRunID      int64
+	AuditRuns       []AuditRunOption
 }
 
 // ListPresenter transforms site and list data for UI display.
@@ -43,6 +52,8 @@ func (p *ListPresenter) ToSiteListsViewModel(data *application.SiteWithListsData
 			TotalLists:      0,
 			ListsWithUnique: 0,
 			TotalItems:      0,
+			AuditRunID:      0,
+			AuditRuns:       []AuditRunOption{},
 		}
 	}
 
@@ -52,6 +63,8 @@ func (p *ListPresenter) ToSiteListsViewModel(data *application.SiteWithListsData
 		TotalLists:      data.TotalLists,
 		ListsWithUnique: data.ListsWithUnique,
 		TotalItems:      int(data.TotalItems),
+		AuditRunID:      data.AuditRunID,
+		AuditRuns:       []AuditRunOption{}, // Will be populated by handler
 	}
 }
 
@@ -89,6 +102,11 @@ func (p *ListPresenter) toListSummaries(domainLists []*sharepoint.List) []ListSu
 	summaries := make([]ListSummary, len(domainLists))
 
 	for i, list := range domainLists {
+		var auditRunID int64
+		if list.AuditRunID != nil {
+			auditRunID = *list.AuditRunID
+		}
+		
 		summaries[i] = ListSummary{
 			SiteID:       list.SiteID,
 			SiteURL:      "", // TODO: Investigate if SiteURL should be available in domain model
@@ -100,6 +118,7 @@ func (p *ListPresenter) toListSummaries(domainLists []*sharepoint.List) []ListSu
 			HasUnique:    list.HasUnique,
 			WebTitle:     "", // TODO: Add WebTitle to sharepoint.List or fetch separately
 			LastModified: p.formatAuditRunID(list.AuditRunID),
+			AuditRunID:   auditRunID,
 		}
 	}
 
@@ -134,24 +153,6 @@ func (p *ListPresenter) FilterListsForSearch(lists []ListSummary, searchQuery st
 	return filteredLists
 }
 
-// formatLastModified converts audit timestamps to relative time (e.g., "2 hours ago").
-// Shows formatted date for items older than 30 days.
-func (p *ListPresenter) formatLastModified(auditedAt *time.Time) string {
-	if auditedAt == nil {
-		return ""
-	}
-
-	now := time.Now()
-	diff := now.Sub(*auditedAt)
-
-	if diff.Hours() < 24 {
-		return fmt.Sprintf("%d hours ago", int(diff.Hours()))
-	} else if diff.Hours() < 24*30 { // Extended to 30 days for better UX
-		return fmt.Sprintf("%d days ago", int(diff.Hours()/24))
-	} else {
-		return auditedAt.Format("Jan 2, 2006")
-	}
-}
 
 // formatRelativeDate formats audit dates as relative time (e.g., "5 days ago", "Today").
 func (p *ListPresenter) formatRelativeDate(daysAgo int, auditDate *time.Time) string {

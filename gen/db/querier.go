@@ -12,6 +12,8 @@ import (
 type Querier interface {
 	AddMemberToLink(ctx context.Context, arg AddMemberToLinkParams) error
 	ClearMembersForLink(ctx context.Context, arg ClearMembersForLinkParams) error
+	CompleteAuditRun(ctx context.Context, auditRunID int64) error
+	CompleteAuditRunByJobID(ctx context.Context, jobID string) error
 	CompleteJob(ctx context.Context, arg CompleteJobParams) error
 	CreateAuditRun(ctx context.Context, arg CreateAuditRunParams) (int64, error)
 	CreateJob(ctx context.Context, arg CreateJobParams) error
@@ -21,8 +23,9 @@ type Querier interface {
 	FailJob(ctx context.Context, arg FailJobParams) error
 	// Find all principals with any SharingLinks patterns in login_name
 	GetAllSharingLinks(ctx context.Context, siteID int64) ([]GetAllSharingLinksRow, error)
-	GetAssignmentsForObject(ctx context.Context, arg GetAssignmentsForObjectParams) ([]GetAssignmentsForObjectRow, error)
+	GetAssignmentsForObjectByAuditRun(ctx context.Context, arg GetAssignmentsForObjectByAuditRunParams) ([]GetAssignmentsForObjectByAuditRunRow, error)
 	GetAuditRun(ctx context.Context, auditRunID int64) (GetAuditRunRow, error)
+	GetAuditRunsForSite(ctx context.Context, arg GetAuditRunsForSiteParams) ([]GetAuditRunsForSiteRow, error)
 	// Find principals with Flexible sharing link patterns in login_name
 	GetFlexibleSharingLinks(ctx context.Context, siteID int64) ([]GetFlexibleSharingLinksRow, error)
 	GetItemByGUID(ctx context.Context, arg GetItemByGUIDParams) (GetItemByGUIDRow, error)
@@ -32,20 +35,29 @@ type Querier interface {
 	GetItemSensitivityLabel(ctx context.Context, arg GetItemSensitivityLabelParams) (GetItemSensitivityLabelRow, error)
 	GetJob(ctx context.Context, jobID string) (GetJobRow, error)
 	GetLastCompletedJobForSite(ctx context.Context, arg GetLastCompletedJobForSiteParams) (GetLastCompletedJobForSiteRow, error)
+	GetLatestAuditRunForSite(ctx context.Context, siteID int64) (GetLatestAuditRunForSiteRow, error)
 	GetLinkIDByUrlKindScope(ctx context.Context, arg GetLinkIDByUrlKindScopeParams) (string, error)
 	GetList(ctx context.Context, arg GetListParams) (GetListRow, error)
+	GetListByAuditRun(ctx context.Context, arg GetListByAuditRunParams) (GetListByAuditRunRow, error)
+	// Audit-run-scoped queries for reading historical data
+	GetListsByAuditRun(ctx context.Context, arg GetListsByAuditRunParams) ([]GetListsByAuditRunRow, error)
 	GetListsByWebID(ctx context.Context, arg GetListsByWebIDParams) ([]GetListsByWebIDRow, error)
 	GetListsForSite(ctx context.Context, siteID int64) ([]GetListsForSiteRow, error)
+	GetListsWithUniqueByAuditRun(ctx context.Context, arg GetListsWithUniqueByAuditRunParams) ([]GetListsWithUniqueByAuditRunRow, error)
 	GetRecipientLimits(ctx context.Context, siteID int64) (GetRecipientLimitsRow, error)
-	GetRootPermissionsForPrincipalInWeb(ctx context.Context, arg GetRootPermissionsForPrincipalInWebParams) ([]GetRootPermissionsForPrincipalInWebRow, error)
+	GetRootPermissionsForPrincipalInWebByAuditRun(ctx context.Context, arg GetRootPermissionsForPrincipalInWebByAuditRunParams) ([]GetRootPermissionsForPrincipalInWebByAuditRunRow, error)
 	GetSensitivityLabelsForSite(ctx context.Context, siteID int64) ([]GetSensitivityLabelsForSiteRow, error)
 	GetSharedItemForSharingLink(ctx context.Context, arg GetSharedItemForSharingLinkParams) (GetSharedItemForSharingLinkRow, error)
 	GetSharingAbilities(ctx context.Context, siteID int64) (GetSharingAbilitiesRow, error)
 	GetSharingGovernance(ctx context.Context, siteID int64) (GetSharingGovernanceRow, error)
 	// Get all members (principals) for a specific sharing link
 	GetSharingLinkMembers(ctx context.Context, arg GetSharingLinkMembersParams) ([]GetSharingLinkMembersRow, error)
+	// Get all members (principals) for a specific sharing link filtered by audit run
+	GetSharingLinkMembersByAuditRun(ctx context.Context, arg GetSharingLinkMembersByAuditRunParams) ([]GetSharingLinkMembersByAuditRunRow, error)
 	// Get all sharing links for items in a specific list with item and principal details
 	GetSharingLinksForList(ctx context.Context, arg GetSharingLinksForListParams) ([]GetSharingLinksForListRow, error)
+	// Get all sharing links for items in a specific list filtered by audit run
+	GetSharingLinksForListByAuditRun(ctx context.Context, arg GetSharingLinksForListByAuditRunParams) ([]GetSharingLinksForListByAuditRunRow, error)
 	GetSiteByID(ctx context.Context, siteID int64) (Site, error)
 	GetSiteByURL(ctx context.Context, siteUrl string) (Site, error)
 	GetWeb(ctx context.Context, arg GetWebParams) (GetWebRow, error)
@@ -58,7 +70,9 @@ type Querier interface {
 	InsertSharingLink(ctx context.Context, arg InsertSharingLinkParams) (string, error)
 	InsertWeb(ctx context.Context, arg InsertWebParams) error
 	ItemsForList(ctx context.Context, arg ItemsForListParams) ([]ItemsForListRow, error)
+	ItemsForListByAuditRun(ctx context.Context, arg ItemsForListByAuditRunParams) ([]ItemsForListByAuditRunRow, error)
 	ItemsWithUniqueForList(ctx context.Context, arg ItemsWithUniqueForListParams) ([]ItemsWithUniqueForListRow, error)
+	ItemsWithUniqueForListByAuditRun(ctx context.Context, arg ItemsWithUniqueForListByAuditRunParams) ([]ItemsWithUniqueForListByAuditRunRow, error)
 	ListActiveJobs(ctx context.Context) ([]ListActiveJobsRow, error)
 	ListActiveJobsForSite(ctx context.Context, siteID sql.NullInt64) ([]ListActiveJobsForSiteRow, error)
 	ListAllJobs(ctx context.Context) ([]ListAllJobsRow, error)
@@ -69,6 +83,7 @@ type Querier interface {
 	ListsAll(ctx context.Context) ([]ListsAllRow, error)
 	ListsWithUnique(ctx context.Context) ([]ListsWithUniqueRow, error)
 	ListsWithUniqueForSite(ctx context.Context, siteID int64) ([]ListsWithUniqueForSiteRow, error)
+	MigrateCompletedAuditRuns(ctx context.Context) error
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpsertItemSensitivityLabel(ctx context.Context, arg UpsertItemSensitivityLabelParams) error
 	UpsertPrincipalByLogin(ctx context.Context, arg UpsertPrincipalByLoginParams) (int64, error)

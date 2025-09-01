@@ -15,7 +15,7 @@ import (
 )
 
 // ListLinksTab renders the sharing links tab content with expandable member details
-func ListLinksTab(links []presenters.SharingLink) templ.Component {
+func ListLinksTab(links []presenters.SharingLink, auditRunID int64) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -385,7 +385,7 @@ func ListLinksTab(links []presenters.SharingLink) templ.Component {
 									}()
 								}
 								ctx = templ.InitializeContext(ctx)
-								templ_7745c5c3_Err = ui.ActionButton(fmt.Sprintf("%d members", link.ActualMembersCount), "/sites/"+fmt.Sprintf("%d", link.SiteID)+"/sharing-links/"+fmt.Sprintf("%s", link.LinkID)+"/members/toggle", "members-row-"+fmt.Sprintf("%s", link.LinkID), "default").Render(ctx, templ_7745c5c3_Buffer)
+								templ_7745c5c3_Err = ui.ActionButton(fmt.Sprintf("%d members", link.ActualMembersCount), "/sites/"+fmt.Sprintf("%d", link.SiteID)+"/audit-runs/"+fmt.Sprintf("%d", auditRunID)+"/sharing-links/"+fmt.Sprintf("%s", link.LinkID)+"/members/toggle", "members-row-"+fmt.Sprintf("%s", link.LinkID), "default").Render(ctx, templ_7745c5c3_Buffer)
 								if templ_7745c5c3_Err != nil {
 									return templ_7745c5c3_Err
 								}

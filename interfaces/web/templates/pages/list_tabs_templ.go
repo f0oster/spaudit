@@ -44,7 +44,7 @@ func ListOverviewTab(analytics presenters.ListAnalytics) templ.Component {
 	})
 }
 
-func ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignmentCollection) templ.Component {
+func ListAssignmentsTab(siteID int64, auditRunID int64, collection presenters.ExpandableAssignmentCollection) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -65,7 +65,7 @@ func ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignment
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = list.ListAssignmentsTab(siteID, collection).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = list.ListAssignmentsTab(siteID, auditRunID, collection).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -73,7 +73,7 @@ func ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignment
 	})
 }
 
-func ListItemsTab(listData presenters.ListSummary, items []presenters.ItemSummary) templ.Component {
+func ListItemsTab(listData presenters.ListSummary, auditRunID int64, items []presenters.ItemSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -94,7 +94,7 @@ func ListItemsTab(listData presenters.ListSummary, items []presenters.ItemSummar
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = list.ListItemsTab(listData, items).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = list.ListItemsTab(listData, auditRunID, items).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -102,7 +102,7 @@ func ListItemsTab(listData presenters.ListSummary, items []presenters.ItemSummar
 	})
 }
 
-func ListLinksTab(links []presenters.SharingLink) templ.Component {
+func ListLinksTab(links []presenters.SharingLink, auditRunID int64) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -123,7 +123,7 @@ func ListLinksTab(links []presenters.SharingLink) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = list.ListLinksTab(links).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = list.ListLinksTab(links, auditRunID).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -160,7 +160,7 @@ func SharingLinkMembersList(members []presenters.SharingLinkMember) templ.Compon
 	})
 }
 
-func TabsAndContent(siteID int64, listID string, activeTab string, content templ.Component) templ.Component {
+func TabsAndContent(siteID int64, auditRunID int64, listID string, activeTab string, content templ.Component) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -185,7 +185,7 @@ func TabsAndContent(siteID int64, listID string, activeTab string, content templ
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = core.Tabs(siteID, listID, activeTab).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = core.Tabs(siteID, auditRunID, listID, activeTab).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

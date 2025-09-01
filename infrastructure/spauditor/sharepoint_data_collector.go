@@ -239,7 +239,7 @@ func (s *SharePointDataCollector) auditWeb(ctx context.Context, auditRunID int64
 		return nil, fmt.Errorf("update site title: %w", err)
 	}
 
-	if err := s.repo.SaveWeb(ctx, auditRunID, web); err != nil {
+	if err := s.repo.SaveWeb(ctx, web); err != nil {
 		return nil, fmt.Errorf("save web: %w", err)
 	}
 
@@ -354,7 +354,7 @@ func (s *SharePointDataCollector) auditList(ctx context.Context, auditRunID int6
 	s.progressReporter.ReportProgress(audit.StandardStages.ListProcessing,
 		fmt.Sprintf("List %d/%d - Saving metadata: %s", currentListNumber, totalLists, list.Title), overallPercentage)
 	
-	if err := s.repo.SaveList(ctx, auditRunID, list); err != nil {
+	if err := s.repo.SaveList(ctx, list); err != nil {
 		return fmt.Errorf("save list %s (site_id=%d, list_id=%s): %w", list.Title, siteID, list.ID, err)
 	}
 
@@ -593,7 +593,7 @@ func (s *SharePointDataCollector) auditIndividualItem(ctx context.Context, audit
 	}
 
 	// Save item
-	if err := s.repo.SaveItem(ctx, auditRunID, item); err != nil {
+	if err := s.repo.SaveItem(ctx, item); err != nil {
 		s.metrics.RecordError()
 		return fmt.Errorf("save item %s (site_id=%d, list_id=%s, item_id=%d): %w",
 			item.GUID, siteID, item.ListID, item.ID, err)

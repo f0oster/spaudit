@@ -3,6 +3,7 @@ package executors
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"spaudit/application"
 	"spaudit/domain/audit"
@@ -32,8 +33,14 @@ func (e *SiteAuditExecutor) Execute(ctx context.Context, job *jobs.Job, progress
 	// Extract audit parameters from job context or use default
 	parameters := e.extractParametersFromJob(job)
 
-	// Create audit workflow using factory with parameters
-	workflow, err := e.workflowFactory.CreateAuditWorkflow(siteURL, parameters)
+	// Get audit run ID from job
+	auditRunID := job.GetAuditRunID()
+	if auditRunID == 0 {
+		return fmt.Errorf("job must have an associated audit run")
+	}
+
+	// Create audit workflow using factory with parameters and audit run ID
+	workflow, err := e.workflowFactory.CreateAuditWorkflow(siteURL, auditRunID, parameters)
 	if err != nil {
 		return err
 	}

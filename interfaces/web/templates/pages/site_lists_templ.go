@@ -10,6 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"spaudit/interfaces/web/presenters"
+	"spaudit/interfaces/web/templates/components"
 	"spaudit/interfaces/web/templates/components/core"
 	"spaudit/interfaces/web/templates/components/site"
 )
@@ -63,11 +64,21 @@ func SiteListsPage(vm presenters.SiteListsVM) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			if len(vm.AuditRuns) > 0 {
+				templ_7745c5c3_Err = components.AuditRunSelector(vm.Site.SiteID, vm.AuditRunID, vm.AuditRuns).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 			templ_7745c5c3_Err = site.SiteStatsGrid(vm).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

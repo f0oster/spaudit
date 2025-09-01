@@ -57,7 +57,7 @@ func (r *SqlcListRepository) GetByID(ctx context.Context, siteID int64, listID s
 		BaseTemplate: int(r.FromNullInt64(sqlcList.BaseTemplate)),
 		ItemCount:    int(r.FromNullInt64(sqlcList.ItemCount)),
 		HasUnique:    r.FromNullBool(sqlcList.HasUnique),
-		AuditRunID:   r.FromNullInt64ToPointer(sqlcList.AuditRunID),
+		AuditRunID:   &sqlcList.AuditRunID,
 	}, nil
 }
 
@@ -83,7 +83,7 @@ func (r *SqlcListRepository) GetByWebID(ctx context.Context, siteID int64, webID
 			BaseTemplate: int(r.FromNullInt64(row.BaseTemplate)),
 			ItemCount:    int(r.FromNullInt64(row.ItemCount)),
 			HasUnique:    r.FromNullBool(row.HasUnique),
-			AuditRunID:   r.FromNullInt64ToPointer(row.AuditRunID),
+			AuditRunID:   &row.AuditRunID,
 		}
 	}
 	return domainLists, nil

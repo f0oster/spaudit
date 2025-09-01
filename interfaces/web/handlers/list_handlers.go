@@ -2,15 +2,16 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"spaudit/domain/contracts"
 
 	"spaudit/application"
-	"spaudit/domain/sharepoint"
 	"spaudit/interfaces/web/presenters"
 	"spaudit/interfaces/web/templates/pages"
 )
@@ -23,11 +24,15 @@ type ListHandlers struct {
 	permissionService   *application.PermissionService
 	siteBrowsingService *application.SiteBrowsingService
 	jobService          application.JobService
+	auditService        application.AuditService
 
 	// Presenters (view logic)
 	listPresenter       *presenters.ListPresenter
 	permissionPresenter *presenters.PermissionPresenter
 	sitePresenter       *presenters.SitePresenter
+	
+	// Service factory for creating audit-run-scoped services
+	serviceFactory      application.AuditRunScopedServiceFactory
 }
 
 // NewListHandlers creates a new list handlers instance with required dependencies.
@@ -36,18 +41,22 @@ func NewListHandlers(
 	permissionService *application.PermissionService,
 	siteBrowsingService *application.SiteBrowsingService,
 	jobService application.JobService,
+	auditService application.AuditService,
 	listPresenter *presenters.ListPresenter,
 	permissionPresenter *presenters.PermissionPresenter,
 	sitePresenter *presenters.SitePresenter,
+	serviceFactory application.AuditRunScopedServiceFactory,
 ) *ListHandlers {
 	return &ListHandlers{
 		siteContentService:  siteContentService,
 		permissionService:   permissionService,
 		siteBrowsingService: siteBrowsingService,
 		jobService:          jobService,
+		auditService:        auditService,
 		listPresenter:       listPresenter,
 		permissionPresenter: permissionPresenter,
 		sitePresenter:       sitePresenter,
+		serviceFactory:      serviceFactory,
 	}
 }
 
@@ -57,7 +66,9 @@ func (h *ListHandlers) Home(w http.ResponseWriter, r *http.Request) {
 
 	// Get business data from services
 	allJobs := h.jobService.ListAllJobs()
-	sitesData, err := h.siteBrowsingService.GetAllSitesWithMetadata(ctx)
+	
+	// Get sites with their latest audit run metadata instead of aggregated data
+	sitesData, err := h.getSitesWithLatestAuditRunMetadata(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -80,16 +91,50 @@ func (h *ListHandlers) SiteListsPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// Get business data from service
-	data, err := h.siteContentService.GetSiteWithLists(ctx, siteID)
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get business data from audit-run-scoped service
+	data, err := scopedServices.SiteContentService.GetSiteWithLists(ctx, siteID)
 	if err != nil {
 		http.Error(w, "Site not found", http.StatusNotFound)
 		return
 	}
 
+	// Add audit run information to context for template
+	data.AuditRunID = scopedServices.AuditRunID
+
 	// Convert to view model using presenter
 	viewModel := h.listPresenter.ToSiteListsViewModel(data)
+
+	// Fetch audit runs for selector using audit service
+	auditRunsData, err := h.auditService.GetAuditRunsForSite(ctx, siteID, 50)
+	if err != nil {
+		// Log error but don't fail the request - selector just won't be populated
+		// TODO: Add proper logging
+	} else {
+		// Convert to view model format
+		auditRuns := make([]presenters.AuditRunOption, len(auditRunsData))
+		for i, auditRun := range auditRunsData {
+			auditRuns[i] = presenters.AuditRunOption{
+				ID:        auditRun.ID,
+				StartedAt: auditRun.StartedAt,
+				Status:    auditRun.GetStatus(),
+			}
+		}
+		viewModel.AuditRuns = auditRuns
+	}
 
 	// Render response
 	RenderResponse(ctx, w, r, pages.SiteListsPage(*viewModel))
@@ -104,9 +149,29 @@ func (h *ListHandlers) ListDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// Get business data from services
-	listData, analyticsData, err := h.getListWithAnalytics(ctx, siteID, listID)
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get list data from audit-run-scoped service
+	listData, err := scopedServices.SiteContentService.GetListByID(ctx, siteID, listID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Analyze permissions using audit-run-scoped service
+	analyticsData, err := scopedServices.PermissionService.AnalyzeListPermissions(ctx, siteID, listData)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -129,9 +194,29 @@ func (h *ListHandlers) OverviewTab(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// Get business data from services
-	listData, analyticsData, err := h.getListWithAnalytics(ctx, siteID, listID)
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get list data from audit-run-scoped service
+	listData, err := scopedServices.SiteContentService.GetListByID(ctx, siteID, listID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Analyze permissions using audit-run-scoped service
+	analyticsData, err := scopedServices.PermissionService.AnalyzeListPermissions(ctx, siteID, listData)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -143,7 +228,7 @@ func (h *ListHandlers) OverviewTab(w http.ResponseWriter, r *http.Request) {
 
 	// Check if this is an HTMX partial request or direct navigation
 	if IsHTMXPartialRequest(r) {
-		RenderResponse(ctx, w, r, pages.TabsAndContent(siteID, listID, "overview", pages.ListOverviewTab(analytics)))
+		RenderResponse(ctx, w, r, pages.TabsAndContent(siteID, scopedServices.AuditRunID, listID, "overview", pages.ListOverviewTab(analytics)))
 	} else {
 		// Direct navigation - render full page
 		RenderResponse(ctx, w, r, pages.ListShell(vmList, "overview", pages.ListOverviewTab(analytics)))
@@ -159,9 +244,22 @@ func (h *ListHandlers) AssignmentsTab(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// Get business data from service (assignments with root cause analysis)
-	assignmentsData, err := h.siteContentService.GetListAssignmentsWithRootCause(ctx, siteID, listID)
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get business data from audit-run-scoped service (assignments with root cause analysis)
+	assignmentsData, err := scopedServices.SiteContentService.GetListAssignmentsWithRootCause(ctx, siteID, listID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -171,17 +269,17 @@ func (h *ListHandlers) AssignmentsTab(w http.ResponseWriter, r *http.Request) {
 	assignmentCollection := h.permissionPresenter.ToExpandableAssignmentCollection(assignmentsData, listID)
 
 	if IsHTMXPartialRequest(r) {
-		RenderResponse(ctx, w, r, pages.TabsAndContent(siteID, listID, "assignments", pages.ListAssignmentsTab(siteID, assignmentCollection)))
+		RenderResponse(ctx, w, r, pages.TabsAndContent(siteID, scopedServices.AuditRunID, listID, "assignments", pages.ListAssignmentsTab(siteID, scopedServices.AuditRunID, assignmentCollection)))
 	} else {
 		// Direct navigation - need list data for full page
-		listData, err := h.siteContentService.GetListByID(ctx, siteID, listID)
+		listData, err := scopedServices.SiteContentService.GetListByID(ctx, siteID, listID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		vmList := h.permissionPresenter.MapListToViewModel(listData)
-		RenderResponse(ctx, w, r, pages.ListShell(vmList, "assignments", pages.ListAssignmentsTab(siteID, assignmentCollection)))
+		RenderResponse(ctx, w, r, pages.ListShell(vmList, "assignments", pages.ListAssignmentsTab(siteID, scopedServices.AuditRunID, assignmentCollection)))
 	}
 }
 
@@ -194,6 +292,19 @@ func (h *ListHandlers) ItemsTab(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	// TODO: Implement proper pagination for items tab
 	// - Extract page/limit from query parameters (e.g., ?page=1&limit=50)
@@ -203,7 +314,7 @@ func (h *ListHandlers) ItemsTab(w http.ResponseWriter, r *http.Request) {
 	// - Add loading states for large datasets
 
 	// TEMPORARY: Using high static limit - replace with pagination
-	itemsData, err := h.siteContentService.GetListItems(ctx, siteID, listID, 0, 1000)
+	itemsData, err := scopedServices.SiteContentService.GetListItems(ctx, siteID, listID, 0, 1000)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -217,24 +328,24 @@ func (h *ListHandlers) ItemsTab(w http.ResponseWriter, r *http.Request) {
 
 	if IsHTMXPartialRequest(r) {
 		// Get list data for the tab component
-		listData, err := h.siteContentService.GetListByID(ctx, siteID, listID)
+		listData, err := scopedServices.SiteContentService.GetListByID(ctx, siteID, listID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		vmList := h.permissionPresenter.MapListToViewModel(listData)
-		RenderResponse(ctx, w, r, pages.TabsAndContent(siteID, listID, "items", pages.ListItemsTab(vmList, items)))
+		RenderResponse(ctx, w, r, pages.TabsAndContent(siteID, scopedServices.AuditRunID, listID, "items", pages.ListItemsTab(vmList, scopedServices.AuditRunID, items)))
 	} else {
 		// Direct navigation - need list data for full page
-		listData, err := h.siteContentService.GetListByID(ctx, siteID, listID)
+		listData, err := scopedServices.SiteContentService.GetListByID(ctx, siteID, listID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		vmList := h.permissionPresenter.MapListToViewModel(listData)
-		RenderResponse(ctx, w, r, pages.ListShell(vmList, "items", pages.ListItemsTab(vmList, items)))
+		RenderResponse(ctx, w, r, pages.ListShell(vmList, "items", pages.ListItemsTab(vmList, scopedServices.AuditRunID, items)))
 	}
 }
 
@@ -247,9 +358,22 @@ func (h *ListHandlers) LinksTab(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// Get data with item details from service
-	linkData, err := h.siteContentService.GetListSharingLinksWithItemData(ctx, siteID, listID)
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get data with item details from audit-run-scoped service
+	linkData, err := scopedServices.SiteContentService.GetListSharingLinksWithItemData(ctx, siteID, listID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -262,17 +386,17 @@ func (h *ListHandlers) LinksTab(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if IsHTMXPartialRequest(r) {
-		RenderResponse(ctx, w, r, pages.TabsAndContent(siteID, listID, "links", pages.ListLinksTab(linkVMs)))
+		RenderResponse(ctx, w, r, pages.TabsAndContent(siteID, scopedServices.AuditRunID, listID, "links", pages.ListLinksTab(linkVMs, scopedServices.AuditRunID)))
 	} else {
 		// Direct navigation - need list data for full page
-		listData, err := h.siteContentService.GetListByID(ctx, siteID, listID)
+		listData, err := scopedServices.SiteContentService.GetListByID(ctx, siteID, listID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		vmList := h.permissionPresenter.MapListToViewModel(listData)
-		RenderResponse(ctx, w, r, pages.ListShell(vmList, "links", pages.ListLinksTab(linkVMs)))
+		RenderResponse(ctx, w, r, pages.ListShell(vmList, "links", pages.ListLinksTab(linkVMs, scopedServices.AuditRunID)))
 	}
 }
 
@@ -284,6 +408,19 @@ func (h *ListHandlers) ToggleAssignment(w http.ResponseWriter, r *http.Request) 
 	siteID, err := h.extractSiteID(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -300,7 +437,7 @@ func (h *ListHandlers) ToggleAssignment(w http.ResponseWriter, r *http.Request) 
 
 	if isCurrentlyHidden {
 		// Expand - get business data and generate expanded HTML
-		assignmentsData, err := h.siteContentService.GetListAssignmentsWithRootCause(ctx, siteID, listID)
+		assignmentsData, err := scopedServices.SiteContentService.GetListAssignmentsWithRootCause(ctx, siteID, listID)
 		if err != nil || index >= len(assignmentsData) {
 			http.Error(w, "Assignment not found", http.StatusNotFound)
 			return
@@ -327,11 +464,24 @@ func (h *ListHandlers) SearchLists(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	searchQuery := h.extractSearchQuery(r)
 
-	// Get business data from service
-	listsData, err := h.siteContentService.GetListsForSite(ctx, siteID)
+	// Get business data from audit-run-scoped service
+	listsData, err := scopedServices.SiteContentService.GetListsForSite(ctx, siteID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -342,7 +492,7 @@ func (h *ListHandlers) SearchLists(w http.ResponseWriter, r *http.Request) {
 	filteredLists := h.listPresenter.FilterListsForSearch(listVMs, searchQuery)
 
 	// Return just the table body rows
-	RenderResponse(ctx, w, r, pages.ListTableRows(filteredLists))
+	RenderResponse(ctx, w, r, pages.ListTableRows(filteredLists, siteID, scopedServices.AuditRunID))
 }
 
 // SearchSites handles HTMX search requests for filtering sites
@@ -371,8 +521,30 @@ func (h *ListHandlers) SitesTable(w http.ResponseWriter, r *http.Request) {
 
 	searchQuery := h.extractSearchQuery(r)
 
-	// Get business data from service
-	sitesData, err := h.siteBrowsingService.SearchSites(ctx, searchQuery)
+	// Get sites with their latest audit run metadata instead of aggregated data
+	var sitesData []*contracts.SiteWithMetadata
+	var err error
+	
+	if searchQuery == "" {
+		// No search query - get all sites with latest audit run metadata
+		sitesData, err = h.getSitesWithLatestAuditRunMetadata(ctx)
+	} else {
+		// Search query provided - get all sites first, then filter
+		allSitesData, err := h.getSitesWithLatestAuditRunMetadata(ctx)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		// Filter sites based on search query (simple contains search)
+		for _, siteData := range allSitesData {
+			if strings.Contains(strings.ToLower(siteData.Site.Title), strings.ToLower(searchQuery)) ||
+				strings.Contains(strings.ToLower(siteData.Site.URL), strings.ToLower(searchQuery)) {
+				sitesData = append(sitesData, siteData)
+			}
+		}
+	}
+	
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -397,6 +569,69 @@ func (h *ListHandlers) extractSiteID(r *http.Request) (int64, error) {
 	}
 
 	return siteID, nil
+}
+
+// GetAuditRunsForSite returns audit runs for a site as JSON
+func (h *ListHandlers) GetAuditRunsForSite(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract site ID
+	siteIDStr := chi.URLParam(r, "siteID")
+	siteID, err := strconv.ParseInt(siteIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get audit runs for this site using audit service
+	auditRunsData, err := h.auditService.GetAuditRunsForSite(ctx, siteID, 50)
+	if err != nil {
+		http.Error(w, "Failed to get audit runs", http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to JSON response format
+	type AuditRunResponse struct {
+		ID        int64  `json:"id"`
+		StartedAt string `json:"started_at"`
+		Status    string `json:"status"`
+	}
+
+	auditRuns := make([]AuditRunResponse, len(auditRunsData))
+	for i, auditRun := range auditRunsData {
+		auditRuns[i] = AuditRunResponse{
+			ID:        auditRun.ID,
+			StartedAt: auditRun.StartedAt.Format("2006-01-02 15:04:05"),
+			Status:    auditRun.GetStatus(),
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(auditRuns); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// extractAuditRunID extracts audit run ID from URL parameters
+// Returns "latest" as special case or parses the numeric ID
+func (h *ListHandlers) extractAuditRunID(r *http.Request) (string, error) {
+	auditRunIDParam := chi.URLParam(r, "auditRunID")
+	if auditRunIDParam == "" {
+		// Default to "latest" if not specified
+		return "latest", nil
+	}
+	
+	// Allow "latest" as special case
+	if auditRunIDParam == "latest" {
+		return "latest", nil
+	}
+	
+	// Validate that it's a valid number if not "latest"
+	if _, err := strconv.ParseInt(auditRunIDParam, 10, 64); err != nil {
+		return "", fmt.Errorf("invalid auditRunID parameter: %w", err)
+	}
+	
+	return auditRunIDParam, nil
 }
 
 func (h *ListHandlers) extractSiteAndListID(r *http.Request) (int64, string, error) {
@@ -447,21 +682,6 @@ func (h *ListHandlers) parseAssignmentUniqueID(uniqueID string) (string, int, er
 
 // Helper methods for combining business logic calls
 
-func (h *ListHandlers) getListWithAnalytics(ctx context.Context, siteID int64, listID string) (*sharepoint.List, *application.PermissionAnalysisData, error) {
-	// Get list data from service
-	listData, err := h.siteContentService.GetListByID(ctx, siteID, listID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Analyze permissions using service
-	analyticsData, err := h.permissionService.AnalyzeListPermissions(ctx, siteID, listData)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return listData, analyticsData, nil
-}
 
 // GetObjectAssignments handles GET requests for object assignments (HTMX partial)
 func (h *ListHandlers) GetObjectAssignments(w http.ResponseWriter, r *http.Request) {
@@ -472,12 +692,25 @@ func (h *ListHandlers) GetObjectAssignments(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	objectType := chi.URLParam(r, "otype")
 	objectKey := chi.URLParam(r, "okey")
 
-	// Get business data from service
-	assignments, err := h.siteContentService.GetAssignmentsForObject(ctx, siteID, objectType, objectKey)
+	// Get business data from audit-run-scoped service
+	assignments, err := scopedServices.SiteContentService.GetAssignmentsForObject(ctx, siteID, objectType, objectKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -504,6 +737,19 @@ func (h *ListHandlers) GetSharingLinkMembers(w http.ResponseWriter, r *http.Requ
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	linkID := chi.URLParam(r, "linkID")
 	if linkID == "" {
@@ -511,8 +757,8 @@ func (h *ListHandlers) GetSharingLinkMembers(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get business data from service
-	principals, err := h.siteContentService.GetSharingLinkMembers(ctx, siteID, linkID)
+	// Get business data from audit-run-scoped service
+	principals, err := scopedServices.SiteContentService.GetSharingLinkMembers(ctx, siteID, linkID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -537,6 +783,19 @@ func (h *ListHandlers) ToggleSharingLinkMembers(w http.ResponseWriter, r *http.R
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	linkID := chi.URLParam(r, "linkID")
 	if linkID == "" {
@@ -548,8 +807,8 @@ func (h *ListHandlers) ToggleSharingLinkMembers(w http.ResponseWriter, r *http.R
 	currentState := r.FormValue("state")
 	isCurrentlyHidden := currentState == "hidden" || currentState == ""
 
-	// Get business data from service (always needed for member count)
-	principals, err := h.siteContentService.GetSharingLinkMembers(ctx, siteID, linkID)
+	// Get business data from audit-run-scoped service (always needed for member count)
+	principals, err := scopedServices.SiteContentService.GetSharingLinkMembers(ctx, siteID, linkID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -576,7 +835,8 @@ func (h *ListHandlers) ToggleSharingLinkMembers(w http.ResponseWriter, r *http.R
 		memberCount := len(principals)
 		hideText := fmt.Sprintf("Hide %d members", memberCount)
 		siteIDStr := strconv.FormatInt(siteID, 10)
-		endpoint := fmt.Sprintf("/sites/%s/sharing-links/%s/members/toggle", siteIDStr, linkID)
+		auditRunIDStrFormatted := strconv.FormatInt(scopedServices.AuditRunID, 10)
+		endpoint := fmt.Sprintf("/sites/%s/audit-runs/%s/sharing-links/%s/members/toggle", siteIDStr, auditRunIDStrFormatted, linkID)
 		w.Write([]byte(`<button id="btn-members-row-` + linkID + `" hx-swap-oob="true" class="text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline" hx-post="` + endpoint + `" hx-target="#members-row-` + linkID + `" hx-swap="outerHTML" hx-include="#members-row-` + linkID + `">` + hideText + `</button>`))
 	} else {
 		// Hide members - return hidden empty row
@@ -590,7 +850,8 @@ func (h *ListHandlers) ToggleSharingLinkMembers(w http.ResponseWriter, r *http.R
 		memberCount := len(principals)
 		viewText := fmt.Sprintf("%d members", memberCount)
 		siteIDStr := strconv.FormatInt(siteID, 10)
-		endpoint := fmt.Sprintf("/sites/%s/sharing-links/%s/members/toggle", siteIDStr, linkID)
+		auditRunIDStrFormatted := strconv.FormatInt(scopedServices.AuditRunID, 10)
+		endpoint := fmt.Sprintf("/sites/%s/audit-runs/%s/sharing-links/%s/members/toggle", siteIDStr, auditRunIDStrFormatted, linkID)
 		w.Write([]byte(`<button id="btn-members-row-` + linkID + `" hx-swap-oob="true" class="text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline" hx-post="` + endpoint + `" hx-target="#members-row-` + linkID + `" hx-swap="outerHTML" hx-include="#members-row-` + linkID + `">` + viewText + `</button>`))
 	}
 }
@@ -604,6 +865,19 @@ func (h *ListHandlers) ToggleItemAssignments(w http.ResponseWriter, r *http.Requ
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	
+	auditRunIDStr, err := h.extractAuditRunID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Create audit-run-scoped services
+	scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteID, auditRunIDStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create audit-run-scoped services: %v", err), http.StatusInternalServerError)
+		return
+	}
 
 	itemGUID := chi.URLParam(r, "itemGUID")
 
@@ -615,7 +889,7 @@ func (h *ListHandlers) ToggleItemAssignments(w http.ResponseWriter, r *http.Requ
 
 	if isCurrentlyHidden {
 		// Show assignments - load and return expandable row with proper template rendering
-		assignments, err := h.siteContentService.GetAssignmentsForObject(ctx, siteID, "item", itemGUID)
+		assignments, err := scopedServices.SiteContentService.GetAssignmentsForObject(ctx, siteID, "item", itemGUID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -638,7 +912,7 @@ func (h *ListHandlers) ToggleItemAssignments(w http.ResponseWriter, r *http.Requ
 
 		// Update button text with OOB swap
 		siteIDStr := strconv.FormatInt(siteID, 10)
-		endpoint := fmt.Sprintf("/sites/%s/items/%s/assignments/toggle", siteIDStr, itemGUID)
+		endpoint := fmt.Sprintf("/sites/%s/audit-runs/%s/items/%s/assignments/toggle", siteIDStr, auditRunIDStr, itemGUID)
 		w.Write([]byte(`<button id="btn-assign-row-` + itemGUID + `" hx-swap-oob="true" class="text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline" hx-post="` + endpoint + `" hx-target="#assign-row-` + itemGUID + `" hx-swap="outerHTML" hx-include="#assign-row-` + itemGUID + `">Hide assignments</button>`))
 	} else {
 		// Hide assignments - return hidden empty row
@@ -650,7 +924,63 @@ func (h *ListHandlers) ToggleItemAssignments(w http.ResponseWriter, r *http.Requ
 
 		// Update button text with OOB swap
 		siteIDStr := strconv.FormatInt(siteID, 10)
-		endpoint := fmt.Sprintf("/sites/%s/items/%s/assignments/toggle", siteIDStr, itemGUID)
+		endpoint := fmt.Sprintf("/sites/%s/audit-runs/%s/items/%s/assignments/toggle", siteIDStr, auditRunIDStr, itemGUID)
 		w.Write([]byte(`<button id="btn-assign-row-` + itemGUID + `" hx-swap-oob="true" class="text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline" hx-post="` + endpoint + `" hx-target="#assign-row-` + itemGUID + `" hx-swap="outerHTML" hx-include="#assign-row-` + itemGUID + `">Assignments</button>`))
 	}
+}
+
+
+// getSitesWithLatestAuditRunMetadata gets all sites with their latest audit run metadata
+// instead of aggregated metadata across all audit runs
+func (h *ListHandlers) getSitesWithLatestAuditRunMetadata(ctx context.Context) ([]*contracts.SiteWithMetadata, error) {
+	// First, get all sites (without metadata aggregation)
+	allSitesData, err := h.siteBrowsingService.GetAllSitesWithMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// For each site, get the latest audit run metadata using fully scoped services
+	var latestSitesData []*contracts.SiteWithMetadata
+	for _, siteData := range allSitesData {
+		// Use the scoped service factory to get latest audit run data
+		scopedServices, err := h.serviceFactory.CreateForAuditRun(ctx, siteData.Site.ID, "latest")
+		if err != nil {
+			// If no audit runs exist for this site, skip it or use the original data
+			latestSitesData = append(latestSitesData, siteData)
+			continue
+		}
+
+		// Get site metadata for the latest audit run using fully scoped services
+		latestSiteData, err := scopedServices.SiteBrowsingService.GetSiteWithMetadata(ctx, siteData.Site.ID)
+		if err != nil {
+			// If error getting latest data, fall back to original
+			latestSitesData = append(latestSitesData, siteData)
+			continue
+		}
+
+		latestSitesData = append(latestSitesData, latestSiteData)
+	}
+
+	return latestSitesData, nil
+}
+
+// SwitchAuditRun handles audit run switching from the selector
+func (h *ListHandlers) SwitchAuditRun(w http.ResponseWriter, r *http.Request) {
+	siteID := chi.URLParam(r, "siteID")
+	
+	// Get selected run ID from form value (POST) or query parameter (GET)
+	selectedRunID := r.FormValue("audit_run_id")
+	if selectedRunID == "" {
+		selectedRunID = r.URL.Query().Get("audit-run-selector")
+	}
+	if selectedRunID == "" {
+		selectedRunID = "latest"
+	}
+	
+	// Redirect to the same page but with the new audit run ID
+	// For now, redirect to lists page - could be made more sophisticated
+	redirectURL := fmt.Sprintf("/sites/%s/audit-runs/%s/lists", siteID, selectedRunID)
+	
+	w.Header().Set("HX-Redirect", redirectURL)
+	w.WriteHeader(http.StatusOK)
 }

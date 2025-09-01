@@ -22,7 +22,7 @@ import (
 // - Consider infinite scroll as alternative for better UX
 // - Add total count display ("Showing 1-50 of 309 items")
 // - Add client-side filtering and sorting controls
-func ListItemsTab(list presenters.ListSummary, items []presenters.ItemSummary) templ.Component {
+func ListItemsTab(list presenters.ListSummary, auditRunID int64, items []presenters.ItemSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -264,7 +264,7 @@ func ListItemsTab(list presenters.ListSummary, items []presenters.ItemSummary) t
 									}()
 								}
 								ctx = templ.InitializeContext(ctx)
-								templ_7745c5c3_Err = ui.ActionButton("Assignments", "/sites/"+fmt.Sprintf("%d", list.SiteID)+"/items/"+it.ItemGUID+"/assignments/toggle", "assign-row-"+it.ItemGUID, "primary").Render(ctx, templ_7745c5c3_Buffer)
+								templ_7745c5c3_Err = ui.ActionButton("Assignments", "/sites/"+fmt.Sprintf("%d", list.SiteID)+"/audit-runs/"+fmt.Sprintf("%d", auditRunID)+"/items/"+it.ItemGUID+"/assignments/toggle", "assign-row-"+it.ItemGUID, "primary").Render(ctx, templ_7745c5c3_Buffer)
 								if templ_7745c5c3_Err != nil {
 									return templ_7745c5c3_Err
 								}

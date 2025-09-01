@@ -38,7 +38,7 @@ func (pc *PermissionCollector) CollectRoleDefinitions(ctx context.Context, audit
 		roleDef.SiteID = siteID
 	}
 
-	if err := pc.repo.SaveRoleDefinitions(ctx, auditRunID, roleDefs); err != nil {
+	if err := pc.repo.SaveRoleDefinitions(ctx, roleDefs); err != nil {
 		return fmt.Errorf("save role definitions: %w", err)
 	}
 
@@ -95,7 +95,7 @@ func (pc *PermissionCollector) collectRoleAssignmentsWithKey(ctx context.Context
 	// Save principals (set site ID for each)
 	for _, principal := range principals {
 		principal.SiteID = siteID
-		if err := pc.repo.SavePrincipal(ctx, auditRunID, principal); err != nil {
+		if err := pc.repo.SavePrincipal(ctx, principal); err != nil {
 			// Check if context was canceled - if so, return the error to stop processing
 			if ctx.Err() != nil {
 				return fmt.Errorf("context canceled while saving principal %d: %w", principal.ID, ctx.Err())
@@ -119,7 +119,7 @@ func (pc *PermissionCollector) collectRoleAssignmentsWithKey(ctx context.Context
 	}
 
 	// Save assignments
-	if err := pc.repo.SaveRoleAssignments(ctx, auditRunID, assignments); err != nil {
+	if err := pc.repo.SaveRoleAssignments(ctx, assignments); err != nil {
 		return fmt.Errorf("save role assignments: %w", err)
 	}
 

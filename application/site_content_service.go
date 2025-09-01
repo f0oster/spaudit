@@ -17,19 +17,38 @@ type SiteWithListsData struct {
 	TotalItems       int64
 	LastAuditDate    *time.Time
 	LastAuditDaysAgo int
+	AuditRunID       int64
 }
 
 // SiteContentService handles business logic for site content hierarchy operations using aggregate repository.
 type SiteContentService struct {
 	contentAggregate contracts.SiteContentAggregateRepository
+	auditRunID       int64 // For audit-scoped operations
 }
 
 // NewSiteContentService creates a new site content service with aggregate repository dependency injection.
 func NewSiteContentService(
 	contentAggregate contracts.SiteContentAggregateRepository,
 ) *SiteContentService {
+	return newSiteContentService(contentAggregate, 0) // 0 means no specific audit run
+}
+
+// NewAuditScopedSiteContentService creates a site content service scoped to a specific audit run.
+func NewAuditScopedSiteContentService(
+	contentAggregate contracts.SiteContentAggregateRepository,
+	auditRunID int64,
+) *SiteContentService {
+	return newSiteContentService(contentAggregate, auditRunID)
+}
+
+// newSiteContentService is the common constructor.
+func newSiteContentService(
+	contentAggregate contracts.SiteContentAggregateRepository,
+	auditRunID int64,
+) *SiteContentService {
 	return &SiteContentService{
 		contentAggregate: contentAggregate,
+		auditRunID:       auditRunID,
 	}
 }
 
@@ -92,9 +111,9 @@ func (s *SiteContentService) GetListsForSite(ctx context.Context, siteID int64) 
 	return s.contentAggregate.GetListsForSite(ctx, siteID)
 }
 
-// GetListAssignmentsWithRootCause retrieves resolved assignments with root cause analysis for a list.
+// GetListAssignmentsWithRootCause retrieves resolved assignments with root cause analysis for a list (audit-scoped).
 func (s *SiteContentService) GetListAssignmentsWithRootCause(ctx context.Context, siteID int64, listID string) ([]*sharepoint.ResolvedAssignment, error) {
-	return s.contentAggregate.GetListAssignmentsWithRootCause(ctx, siteID, listID)
+	return s.contentAggregate.GetListAssignmentsWithRootCause(ctx, siteID, s.auditRunID, listID)
 }
 
 // GetListItems retrieves items with unique permissions for a list with pagination.
@@ -112,9 +131,9 @@ func (s *SiteContentService) GetListSharingLinksWithItemData(ctx context.Context
 	return s.contentAggregate.GetListSharingLinksWithItemData(ctx, siteID, listID)
 }
 
-// GetAssignmentsForObject retrieves assignments for any object type.
+// GetAssignmentsForObject retrieves assignments for any object type (audit-scoped).
 func (s *SiteContentService) GetAssignmentsForObject(ctx context.Context, siteID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error) {
-	return s.contentAggregate.GetAssignmentsForObject(ctx, siteID, objectType, objectKey)
+	return s.contentAggregate.GetAssignmentsForObject(ctx, siteID, s.auditRunID, objectType, objectKey)
 }
 
 // GetSharingLinkMembers retrieves members for a sharing link.

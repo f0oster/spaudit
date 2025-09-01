@@ -47,7 +47,7 @@ func (r *SqlcItemRepository) GetItemsForList(ctx context.Context, siteID int64, 
 			IsFile:       r.FromNullBool(item.IsFile),
 			IsFolder:     r.FromNullBool(item.IsFolder),
 			HasUnique:    r.FromNullBool(item.HasUnique),
-			AuditRunID:   r.FromNullInt64ToPointer(item.AuditRunID),
+			AuditRunID:   &item.AuditRunID,
 		}
 	}
 	return domainItems, nil
@@ -79,7 +79,7 @@ func (r *SqlcItemRepository) GetItemsWithUniqueForList(ctx context.Context, site
 			IsFile:       r.FromNullBool(item.IsFile),
 			IsFolder:     r.FromNullBool(item.IsFolder),
 			HasUnique:    r.FromNullBool(item.HasUnique),
-			AuditRunID:   r.FromNullInt64ToPointer(item.AuditRunID),
+			AuditRunID:   &item.AuditRunID,
 		}
 	}
 	return domainItems, nil

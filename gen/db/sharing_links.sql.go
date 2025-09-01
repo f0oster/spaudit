@@ -16,10 +16,10 @@ VALUES (?1, ?2, ?3, ?4)
 `
 
 type AddMemberToLinkParams struct {
-	SiteID      int64         `json:"site_id"`
-	LinkID      string        `json:"link_id"`
-	PrincipalID int64         `json:"principal_id"`
-	AuditRunID  sql.NullInt64 `json:"audit_run_id"`
+	SiteID      int64  `json:"site_id"`
+	LinkID      string `json:"link_id"`
+	PrincipalID int64  `json:"principal_id"`
+	AuditRunID  int64  `json:"audit_run_id"`
 }
 
 func (q *Queries) AddMemberToLink(ctx context.Context, arg AddMemberToLinkParams) error {
@@ -490,6 +490,66 @@ func (q *Queries) GetSharingLinkMembers(ctx context.Context, arg GetSharingLinkM
 	return items, nil
 }
 
+const getSharingLinkMembersByAuditRun = `-- name: GetSharingLinkMembersByAuditRun :many
+SELECT 
+  p.site_id,
+  p.principal_id,
+  p.title,
+  p.login_name,
+  p.email,
+  p.principal_type
+FROM sharing_link_members slm
+JOIN principals p ON slm.site_id = p.site_id AND slm.principal_id = p.principal_id AND p.audit_run_id = slm.audit_run_id
+WHERE slm.site_id = ?1 AND slm.link_id = ?2 AND slm.audit_run_id = ?3
+ORDER BY p.title
+`
+
+type GetSharingLinkMembersByAuditRunParams struct {
+	SiteID     int64  `json:"site_id"`
+	LinkID     string `json:"link_id"`
+	AuditRunID int64  `json:"audit_run_id"`
+}
+
+type GetSharingLinkMembersByAuditRunRow struct {
+	SiteID        int64          `json:"site_id"`
+	PrincipalID   int64          `json:"principal_id"`
+	Title         sql.NullString `json:"title"`
+	LoginName     sql.NullString `json:"login_name"`
+	Email         sql.NullString `json:"email"`
+	PrincipalType int64          `json:"principal_type"`
+}
+
+// Get all members (principals) for a specific sharing link filtered by audit run
+func (q *Queries) GetSharingLinkMembersByAuditRun(ctx context.Context, arg GetSharingLinkMembersByAuditRunParams) ([]GetSharingLinkMembersByAuditRunRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSharingLinkMembersByAuditRun, arg.SiteID, arg.LinkID, arg.AuditRunID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSharingLinkMembersByAuditRunRow
+	for rows.Next() {
+		var i GetSharingLinkMembersByAuditRunRow
+		if err := rows.Scan(
+			&i.SiteID,
+			&i.PrincipalID,
+			&i.Title,
+			&i.LoginName,
+			&i.Email,
+			&i.PrincipalType,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSharingLinksForList = `-- name: GetSharingLinksForList :many
 SELECT 
   sl.site_id,
@@ -565,6 +625,120 @@ func (q *Queries) GetSharingLinksForList(ctx context.Context, arg GetSharingLink
 	var items []GetSharingLinksForListRow
 	for rows.Next() {
 		var i GetSharingLinksForListRow
+		if err := rows.Scan(
+			&i.SiteID,
+			&i.LinkID,
+			&i.ItemGuid,
+			&i.FileFolderUniqueID,
+			&i.Url,
+			&i.LinkKind,
+			&i.Scope,
+			&i.IsActive,
+			&i.IsDefault,
+			&i.IsEditLink,
+			&i.IsReviewLink,
+			&i.CreatedAt,
+			&i.LastModifiedAt,
+			&i.TotalMembersCount,
+			&i.ActualMembersCount,
+			&i.ItemName,
+			&i.ItemUrl,
+			&i.IsFile,
+			&i.IsFolder,
+			&i.CreatedByTitle,
+			&i.CreatedByLogin,
+			&i.ModifiedByTitle,
+			&i.ModifiedByLogin,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSharingLinksForListByAuditRun = `-- name: GetSharingLinksForListByAuditRun :many
+SELECT 
+  sl.site_id,
+  sl.link_id,
+  sl.item_guid,
+  sl.file_folder_unique_id,
+  sl.url,
+  sl.link_kind,
+  sl.scope,
+  sl.is_active,
+  sl.is_default,
+  sl.is_edit_link,
+  sl.is_review_link,
+  sl.created_at,
+  sl.last_modified_at,
+  sl.total_members_count,
+  (SELECT COUNT(*) FROM sharing_link_members slm WHERE slm.site_id = sl.site_id AND slm.link_id = sl.link_id AND slm.audit_run_id = sl.audit_run_id) as actual_members_count,
+  i.name as item_name,
+  i.url as item_url,
+  i.is_file,
+  i.is_folder,
+  cb.title as created_by_title,
+  cb.login_name as created_by_login,
+  mb.title as modified_by_title,
+  mb.login_name as modified_by_login
+FROM sharing_links sl
+LEFT JOIN items i ON (sl.site_id = i.site_id AND (sl.item_guid = i.item_guid OR sl.file_folder_unique_id = i.item_guid) AND i.audit_run_id = sl.audit_run_id)
+LEFT JOIN principals cb ON sl.site_id = cb.site_id AND sl.created_by_principal_id = cb.principal_id AND cb.audit_run_id = sl.audit_run_id
+LEFT JOIN principals mb ON sl.site_id = mb.site_id AND sl.last_modified_by_principal_id = mb.principal_id AND mb.audit_run_id = sl.audit_run_id
+WHERE sl.site_id = ?1 AND i.list_id = ?2
+  AND sl.is_active = 1 AND sl.audit_run_id = ?3
+ORDER BY sl.created_at DESC, sl.link_id
+`
+
+type GetSharingLinksForListByAuditRunParams struct {
+	SiteID     int64  `json:"site_id"`
+	ListID     string `json:"list_id"`
+	AuditRunID int64  `json:"audit_run_id"`
+}
+
+type GetSharingLinksForListByAuditRunRow struct {
+	SiteID             int64          `json:"site_id"`
+	LinkID             string         `json:"link_id"`
+	ItemGuid           sql.NullString `json:"item_guid"`
+	FileFolderUniqueID sql.NullString `json:"file_folder_unique_id"`
+	Url                sql.NullString `json:"url"`
+	LinkKind           sql.NullInt64  `json:"link_kind"`
+	Scope              sql.NullInt64  `json:"scope"`
+	IsActive           sql.NullBool   `json:"is_active"`
+	IsDefault          sql.NullBool   `json:"is_default"`
+	IsEditLink         sql.NullBool   `json:"is_edit_link"`
+	IsReviewLink       sql.NullBool   `json:"is_review_link"`
+	CreatedAt          sql.NullTime   `json:"created_at"`
+	LastModifiedAt     sql.NullTime   `json:"last_modified_at"`
+	TotalMembersCount  sql.NullInt64  `json:"total_members_count"`
+	ActualMembersCount int64          `json:"actual_members_count"`
+	ItemName           sql.NullString `json:"item_name"`
+	ItemUrl            sql.NullString `json:"item_url"`
+	IsFile             sql.NullBool   `json:"is_file"`
+	IsFolder           sql.NullBool   `json:"is_folder"`
+	CreatedByTitle     sql.NullString `json:"created_by_title"`
+	CreatedByLogin     sql.NullString `json:"created_by_login"`
+	ModifiedByTitle    sql.NullString `json:"modified_by_title"`
+	ModifiedByLogin    sql.NullString `json:"modified_by_login"`
+}
+
+// Get all sharing links for items in a specific list filtered by audit run
+func (q *Queries) GetSharingLinksForListByAuditRun(ctx context.Context, arg GetSharingLinksForListByAuditRunParams) ([]GetSharingLinksForListByAuditRunRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSharingLinksForListByAuditRun, arg.SiteID, arg.ListID, arg.AuditRunID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSharingLinksForListByAuditRunRow
+	for rows.Next() {
+		var i GetSharingLinksForListByAuditRunRow
 		if err := rows.Scan(
 			&i.SiteID,
 			&i.LinkID,
@@ -736,7 +910,7 @@ type InsertSharingLinkParams struct {
 	ShareID                           sql.NullString `json:"share_id"`
 	ShareToken                        sql.NullString `json:"share_token"`
 	SharingLinkStatus                 sql.NullInt64  `json:"sharing_link_status"`
-	AuditRunID                        sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID                        int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) InsertSharingLink(ctx context.Context, arg InsertSharingLinkParams) (string, error) {
@@ -792,6 +966,7 @@ const upsertItemSensitivityLabel = `-- name: UpsertItemSensitivityLabel :exec
 INSERT INTO sensitivity_labels (
   site_id,
   item_guid,
+  audit_run_id,
   label_id,
   display_name,
   owner_email,
@@ -816,9 +991,10 @@ INSERT INTO sensitivity_labels (
   ?10,
   ?11,
   ?12,
-  ?13
+  ?13,
+  ?14
 )
-ON CONFLICT(site_id, item_guid) DO UPDATE SET
+ON CONFLICT(site_id, item_guid, audit_run_id) DO UPDATE SET
   label_id                = excluded.label_id,
   display_name            = excluded.display_name,
   owner_email             = excluded.owner_email,
@@ -835,6 +1011,7 @@ ON CONFLICT(site_id, item_guid) DO UPDATE SET
 type UpsertItemSensitivityLabelParams struct {
 	SiteID           int64          `json:"site_id"`
 	ItemGuid         string         `json:"item_guid"`
+	AuditRunID       int64          `json:"audit_run_id"`
 	LabelID          sql.NullString `json:"label_id"`
 	DisplayName      sql.NullString `json:"display_name"`
 	OwnerEmail       sql.NullString `json:"owner_email"`
@@ -852,6 +1029,7 @@ func (q *Queries) UpsertItemSensitivityLabel(ctx context.Context, arg UpsertItem
 	_, err := q.db.ExecContext(ctx, upsertItemSensitivityLabel,
 		arg.SiteID,
 		arg.ItemGuid,
+		arg.AuditRunID,
 		arg.LabelID,
 		arg.DisplayName,
 		arg.OwnerEmail,
@@ -870,6 +1048,7 @@ func (q *Queries) UpsertItemSensitivityLabel(ctx context.Context, arg UpsertItem
 const upsertRecipientLimits = `-- name: UpsertRecipientLimits :exec
 INSERT INTO recipient_limits (
   site_id,
+  audit_run_id,
   check_permissions,
   grant_direct_access,
   share_link,
@@ -879,9 +1058,10 @@ INSERT INTO recipient_limits (
   ?2,
   ?3,
   ?4,
-  ?5
+  ?5,
+  ?6
 )
-ON CONFLICT(site_id) DO UPDATE SET
+ON CONFLICT(site_id, audit_run_id) DO UPDATE SET
   check_permissions               = excluded.check_permissions,
   grant_direct_access             = excluded.grant_direct_access,
   share_link                      = excluded.share_link,
@@ -891,6 +1071,7 @@ ON CONFLICT(site_id) DO UPDATE SET
 
 type UpsertRecipientLimitsParams struct {
 	SiteID                   int64          `json:"site_id"`
+	AuditRunID               int64          `json:"audit_run_id"`
 	CheckPermissions         sql.NullString `json:"check_permissions"`
 	GrantDirectAccess        sql.NullString `json:"grant_direct_access"`
 	ShareLink                sql.NullString `json:"share_link"`
@@ -900,6 +1081,7 @@ type UpsertRecipientLimitsParams struct {
 func (q *Queries) UpsertRecipientLimits(ctx context.Context, arg UpsertRecipientLimitsParams) error {
 	_, err := q.db.ExecContext(ctx, upsertRecipientLimits,
 		arg.SiteID,
+		arg.AuditRunID,
 		arg.CheckPermissions,
 		arg.GrantDirectAccess,
 		arg.ShareLink,
@@ -912,6 +1094,7 @@ const upsertSensitivityLabel = `-- name: UpsertSensitivityLabel :exec
 INSERT INTO sensitivity_labels (
   site_id,
   item_guid,
+  audit_run_id,
   sensitivity_label_id,
   display_name,
   color,
@@ -926,9 +1109,10 @@ INSERT INTO sensitivity_labels (
   ?5,
   ?6,
   ?7,
-  ?8
+  ?8,
+  ?9
 )
-ON CONFLICT(site_id, item_guid) DO UPDATE SET
+ON CONFLICT(site_id, item_guid, audit_run_id) DO UPDATE SET
   sensitivity_label_id                = excluded.sensitivity_label_id,
   display_name                        = excluded.display_name,
   color                               = excluded.color,
@@ -940,6 +1124,7 @@ ON CONFLICT(site_id, item_guid) DO UPDATE SET
 type UpsertSensitivityLabelParams struct {
 	SiteID                         int64          `json:"site_id"`
 	ItemGuid                       string         `json:"item_guid"`
+	AuditRunID                     int64          `json:"audit_run_id"`
 	SensitivityLabelID             sql.NullString `json:"sensitivity_label_id"`
 	DisplayName                    sql.NullString `json:"display_name"`
 	Color                          sql.NullString `json:"color"`
@@ -952,6 +1137,7 @@ func (q *Queries) UpsertSensitivityLabel(ctx context.Context, arg UpsertSensitiv
 	_, err := q.db.ExecContext(ctx, upsertSensitivityLabel,
 		arg.SiteID,
 		arg.ItemGuid,
+		arg.AuditRunID,
 		arg.SensitivityLabelID,
 		arg.DisplayName,
 		arg.Color,
@@ -965,6 +1151,7 @@ func (q *Queries) UpsertSensitivityLabel(ctx context.Context, arg UpsertSensitiv
 const upsertSharingAbilities = `-- name: UpsertSharingAbilities :exec
 INSERT INTO sharing_abilities (
   site_id,
+  audit_run_id,
   can_stop_sharing,
   anonymous_link_abilities,
   anyone_link_abilities,
@@ -978,9 +1165,10 @@ INSERT INTO sharing_abilities (
   ?4,
   ?5,
   ?6,
-  ?7
+  ?7,
+  ?8
 )
-ON CONFLICT(site_id) DO UPDATE SET
+ON CONFLICT(site_id, audit_run_id) DO UPDATE SET
   can_stop_sharing                  = excluded.can_stop_sharing,
   anonymous_link_abilities          = excluded.anonymous_link_abilities,
   anyone_link_abilities             = excluded.anyone_link_abilities,
@@ -992,6 +1180,7 @@ ON CONFLICT(site_id) DO UPDATE SET
 
 type UpsertSharingAbilitiesParams struct {
 	SiteID                     int64          `json:"site_id"`
+	AuditRunID                 int64          `json:"audit_run_id"`
 	CanStopSharing             sql.NullBool   `json:"can_stop_sharing"`
 	AnonymousLinkAbilities     sql.NullString `json:"anonymous_link_abilities"`
 	AnyoneLinkAbilities        sql.NullString `json:"anyone_link_abilities"`
@@ -1003,6 +1192,7 @@ type UpsertSharingAbilitiesParams struct {
 func (q *Queries) UpsertSharingAbilities(ctx context.Context, arg UpsertSharingAbilitiesParams) error {
 	_, err := q.db.ExecContext(ctx, upsertSharingAbilities,
 		arg.SiteID,
+		arg.AuditRunID,
 		arg.CanStopSharing,
 		arg.AnonymousLinkAbilities,
 		arg.AnyoneLinkAbilities,
@@ -1017,6 +1207,7 @@ const upsertSharingGovernance = `-- name: UpsertSharingGovernance :exec
 
 INSERT INTO sharing_governance (
   site_id,
+  audit_run_id,
   tenant_id,
   tenant_display_name,
   sharepoint_site_id,
@@ -1042,9 +1233,10 @@ INSERT INTO sharing_governance (
   ?10,
   ?11,
   ?12,
-  ?13
+  ?13,
+  ?14
 )
-ON CONFLICT(site_id) DO UPDATE SET
+ON CONFLICT(site_id, audit_run_id) DO UPDATE SET
   tenant_id                                  = excluded.tenant_id,
   tenant_display_name                        = excluded.tenant_display_name,
   sharepoint_site_id                         = excluded.sharepoint_site_id,
@@ -1062,6 +1254,7 @@ ON CONFLICT(site_id) DO UPDATE SET
 
 type UpsertSharingGovernanceParams struct {
 	SiteID                                 int64          `json:"site_id"`
+	AuditRunID                             int64          `json:"audit_run_id"`
 	TenantID                               sql.NullString `json:"tenant_id"`
 	TenantDisplayName                      sql.NullString `json:"tenant_display_name"`
 	SharepointSiteID                       sql.NullString `json:"sharepoint_site_id"`
@@ -1082,6 +1275,7 @@ type UpsertSharingGovernanceParams struct {
 func (q *Queries) UpsertSharingGovernance(ctx context.Context, arg UpsertSharingGovernanceParams) error {
 	_, err := q.db.ExecContext(ctx, upsertSharingGovernance,
 		arg.SiteID,
+		arg.AuditRunID,
 		arg.TenantID,
 		arg.TenantDisplayName,
 		arg.SharepointSiteID,

@@ -9,7 +9,7 @@ import (
 )
 
 // ListAssignmentsTab renders the assignments tab content with expandable rows
-templ ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignmentCollection) {
+templ ListAssignmentsTab(siteID int64, auditRunID int64, collection presenters.ExpandableAssignmentCollection) {
 	<!-- Help Cards -->
 	<div class="space-y-4 mb-6">
 		@sharepoint.ConditionalLimitedAccessHelp(collection.HasLimitedAccess)
@@ -45,7 +45,7 @@ templ ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignmen
 					}
 					@ui.TableCell() {
 						if a.HasRootCauses {
-							@ui.ActionButton("Details", "/sites/" + fmt.Sprintf("%d", siteID) + "/assignments/" + a.UniqueID + "/toggle", "expand-row-" + a.UniqueID, "default")
+							@ui.ActionButton("Details", "/sites/" + fmt.Sprintf("%d", siteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/assignments/" + a.UniqueID + "/toggle", "expand-row-" + a.UniqueID, "default")
 						}
 					}
 				}

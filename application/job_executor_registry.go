@@ -44,24 +44,3 @@ func (r *JobExecutorRegistry) GetExecutor(jobType jobs.JobType) (JobExecutor, er
 	return executor, nil
 }
 
-// GetSupportedJobTypes returns all job types that have registered executors.
-func (r *JobExecutorRegistry) GetSupportedJobTypes() []jobs.JobType {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-
-	types := make([]jobs.JobType, 0, len(r.executors))
-	for jobType := range r.executors {
-		types = append(types, jobType)
-	}
-
-	return types
-}
-
-// IsSupported checks if a job type has a registered executor.
-func (r *JobExecutorRegistry) IsSupported(jobType jobs.JobType) bool {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-
-	_, exists := r.executors[jobType]
-	return exists
-}

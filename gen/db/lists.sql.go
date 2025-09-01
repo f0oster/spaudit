@@ -29,7 +29,7 @@ type GetListRow struct {
 	BaseTemplate sql.NullInt64  `json:"base_template"`
 	ItemCount    sql.NullInt64  `json:"item_count"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) GetList(ctx context.Context, arg GetListParams) (GetListRow, error) {
@@ -47,6 +47,109 @@ func (q *Queries) GetList(ctx context.Context, arg GetListParams) (GetListRow, e
 		&i.AuditRunID,
 	)
 	return i, err
+}
+
+const getListByAuditRun = `-- name: GetListByAuditRun :one
+SELECT site_id, list_id, web_id, title, url, base_template, item_count, has_unique, audit_run_id
+FROM lists 
+WHERE site_id = ?1 AND list_id = ?2 AND audit_run_id = ?3
+`
+
+type GetListByAuditRunParams struct {
+	SiteID     int64  `json:"site_id"`
+	ListID     string `json:"list_id"`
+	AuditRunID int64  `json:"audit_run_id"`
+}
+
+type GetListByAuditRunRow struct {
+	SiteID       int64          `json:"site_id"`
+	ListID       string         `json:"list_id"`
+	WebID        string         `json:"web_id"`
+	Title        string         `json:"title"`
+	Url          sql.NullString `json:"url"`
+	BaseTemplate sql.NullInt64  `json:"base_template"`
+	ItemCount    sql.NullInt64  `json:"item_count"`
+	HasUnique    sql.NullBool   `json:"has_unique"`
+	AuditRunID   int64          `json:"audit_run_id"`
+}
+
+func (q *Queries) GetListByAuditRun(ctx context.Context, arg GetListByAuditRunParams) (GetListByAuditRunRow, error) {
+	row := q.db.QueryRowContext(ctx, getListByAuditRun, arg.SiteID, arg.ListID, arg.AuditRunID)
+	var i GetListByAuditRunRow
+	err := row.Scan(
+		&i.SiteID,
+		&i.ListID,
+		&i.WebID,
+		&i.Title,
+		&i.Url,
+		&i.BaseTemplate,
+		&i.ItemCount,
+		&i.HasUnique,
+		&i.AuditRunID,
+	)
+	return i, err
+}
+
+const getListsByAuditRun = `-- name: GetListsByAuditRun :many
+
+SELECT l.site_id, l.list_id, l.web_id, l.title, l.url, l.base_template, l.item_count, l.has_unique, w.title AS web_title, l.audit_run_id
+FROM lists l
+JOIN webs w ON w.site_id = l.site_id AND w.web_id = l.web_id AND w.audit_run_id = l.audit_run_id
+WHERE l.site_id = ?1 AND l.audit_run_id = ?2
+ORDER BY w.title, l.title
+`
+
+type GetListsByAuditRunParams struct {
+	SiteID     int64 `json:"site_id"`
+	AuditRunID int64 `json:"audit_run_id"`
+}
+
+type GetListsByAuditRunRow struct {
+	SiteID       int64          `json:"site_id"`
+	ListID       string         `json:"list_id"`
+	WebID        string         `json:"web_id"`
+	Title        string         `json:"title"`
+	Url          sql.NullString `json:"url"`
+	BaseTemplate sql.NullInt64  `json:"base_template"`
+	ItemCount    sql.NullInt64  `json:"item_count"`
+	HasUnique    sql.NullBool   `json:"has_unique"`
+	WebTitle     sql.NullString `json:"web_title"`
+	AuditRunID   int64          `json:"audit_run_id"`
+}
+
+// Audit-run-scoped queries for reading historical data
+func (q *Queries) GetListsByAuditRun(ctx context.Context, arg GetListsByAuditRunParams) ([]GetListsByAuditRunRow, error) {
+	rows, err := q.db.QueryContext(ctx, getListsByAuditRun, arg.SiteID, arg.AuditRunID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetListsByAuditRunRow
+	for rows.Next() {
+		var i GetListsByAuditRunRow
+		if err := rows.Scan(
+			&i.SiteID,
+			&i.ListID,
+			&i.WebID,
+			&i.Title,
+			&i.Url,
+			&i.BaseTemplate,
+			&i.ItemCount,
+			&i.HasUnique,
+			&i.WebTitle,
+			&i.AuditRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getListsByWebID = `-- name: GetListsByWebID :many
@@ -69,7 +172,7 @@ type GetListsByWebIDRow struct {
 	BaseTemplate sql.NullInt64  `json:"base_template"`
 	ItemCount    sql.NullInt64  `json:"item_count"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) GetListsByWebID(ctx context.Context, arg GetListsByWebIDParams) ([]GetListsByWebIDRow, error) {
@@ -156,6 +259,66 @@ func (q *Queries) GetListsForSite(ctx context.Context, siteID int64) ([]GetLists
 	return items, nil
 }
 
+const getListsWithUniqueByAuditRun = `-- name: GetListsWithUniqueByAuditRun :many
+SELECT l.site_id, l.list_id, l.web_id, l.title, l.url, l.base_template, l.item_count, l.has_unique, w.title AS web_title, l.audit_run_id
+FROM lists l
+JOIN webs w ON w.site_id = l.site_id AND w.web_id = l.web_id AND w.audit_run_id = l.audit_run_id
+WHERE l.site_id = ?1 AND l.audit_run_id = ?2 AND l.has_unique = 1
+ORDER BY w.title, l.title
+`
+
+type GetListsWithUniqueByAuditRunParams struct {
+	SiteID     int64 `json:"site_id"`
+	AuditRunID int64 `json:"audit_run_id"`
+}
+
+type GetListsWithUniqueByAuditRunRow struct {
+	SiteID       int64          `json:"site_id"`
+	ListID       string         `json:"list_id"`
+	WebID        string         `json:"web_id"`
+	Title        string         `json:"title"`
+	Url          sql.NullString `json:"url"`
+	BaseTemplate sql.NullInt64  `json:"base_template"`
+	ItemCount    sql.NullInt64  `json:"item_count"`
+	HasUnique    sql.NullBool   `json:"has_unique"`
+	WebTitle     sql.NullString `json:"web_title"`
+	AuditRunID   int64          `json:"audit_run_id"`
+}
+
+func (q *Queries) GetListsWithUniqueByAuditRun(ctx context.Context, arg GetListsWithUniqueByAuditRunParams) ([]GetListsWithUniqueByAuditRunRow, error) {
+	rows, err := q.db.QueryContext(ctx, getListsWithUniqueByAuditRun, arg.SiteID, arg.AuditRunID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetListsWithUniqueByAuditRunRow
+	for rows.Next() {
+		var i GetListsWithUniqueByAuditRunRow
+		if err := rows.Scan(
+			&i.SiteID,
+			&i.ListID,
+			&i.WebID,
+			&i.Title,
+			&i.Url,
+			&i.BaseTemplate,
+			&i.ItemCount,
+			&i.HasUnique,
+			&i.WebTitle,
+			&i.AuditRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertList = `-- name: InsertList :exec
 INSERT INTO lists (site_id, list_id, web_id, title, url, base_template, item_count, has_unique, audit_run_id)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
@@ -170,7 +333,7 @@ type InsertListParams struct {
 	BaseTemplate sql.NullInt64  `json:"base_template"`
 	ItemCount    sql.NullInt64  `json:"item_count"`
 	HasUnique    sql.NullBool   `json:"has_unique"`
-	AuditRunID   sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID   int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) InsertList(ctx context.Context, arg InsertListParams) error {

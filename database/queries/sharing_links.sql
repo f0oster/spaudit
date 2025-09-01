@@ -156,6 +156,40 @@ WHERE sl.site_id = sqlc.arg(site_id) AND i.list_id = sqlc.arg(list_id)
   AND sl.is_active = 1
 ORDER BY sl.created_at DESC, sl.link_id;
 
+-- name: GetSharingLinksForListByAuditRun :many
+-- Get all sharing links for items in a specific list filtered by audit run
+SELECT 
+  sl.site_id,
+  sl.link_id,
+  sl.item_guid,
+  sl.file_folder_unique_id,
+  sl.url,
+  sl.link_kind,
+  sl.scope,
+  sl.is_active,
+  sl.is_default,
+  sl.is_edit_link,
+  sl.is_review_link,
+  sl.created_at,
+  sl.last_modified_at,
+  sl.total_members_count,
+  (SELECT COUNT(*) FROM sharing_link_members slm WHERE slm.site_id = sl.site_id AND slm.link_id = sl.link_id AND slm.audit_run_id = sl.audit_run_id) as actual_members_count,
+  i.name as item_name,
+  i.url as item_url,
+  i.is_file,
+  i.is_folder,
+  cb.title as created_by_title,
+  cb.login_name as created_by_login,
+  mb.title as modified_by_title,
+  mb.login_name as modified_by_login
+FROM sharing_links sl
+LEFT JOIN items i ON (sl.site_id = i.site_id AND (sl.item_guid = i.item_guid OR sl.file_folder_unique_id = i.item_guid) AND i.audit_run_id = sl.audit_run_id)
+LEFT JOIN principals cb ON sl.site_id = cb.site_id AND sl.created_by_principal_id = cb.principal_id AND cb.audit_run_id = sl.audit_run_id
+LEFT JOIN principals mb ON sl.site_id = mb.site_id AND sl.last_modified_by_principal_id = mb.principal_id AND mb.audit_run_id = sl.audit_run_id
+WHERE sl.site_id = sqlc.arg(site_id) AND i.list_id = sqlc.arg(list_id)
+  AND sl.is_active = 1 AND sl.audit_run_id = sqlc.arg(audit_run_id)
+ORDER BY sl.created_at DESC, sl.link_id;
+
 -- name: GetSharingLinkMembers :many
 -- Get all members (principals) for a specific sharing link
 SELECT 
@@ -170,6 +204,20 @@ JOIN principals p ON slm.site_id = p.site_id AND slm.principal_id = p.principal_
 WHERE slm.site_id = sqlc.arg(site_id) AND slm.link_id = sqlc.arg(link_id)
 ORDER BY p.title;
 
+-- name: GetSharingLinkMembersByAuditRun :many
+-- Get all members (principals) for a specific sharing link filtered by audit run
+SELECT 
+  p.site_id,
+  p.principal_id,
+  p.title,
+  p.login_name,
+  p.email,
+  p.principal_type
+FROM sharing_link_members slm
+JOIN principals p ON slm.site_id = p.site_id AND slm.principal_id = p.principal_id AND p.audit_run_id = slm.audit_run_id
+WHERE slm.site_id = sqlc.arg(site_id) AND slm.link_id = sqlc.arg(link_id) AND slm.audit_run_id = sqlc.arg(audit_run_id)
+ORDER BY p.title;
+
 -- ==================================
 -- Governance table queries
 -- ==================================
@@ -177,6 +225,7 @@ ORDER BY p.title;
 -- name: UpsertSharingGovernance :exec
 INSERT INTO sharing_governance (
   site_id,
+  audit_run_id,
   tenant_id,
   tenant_display_name,
   sharepoint_site_id,
@@ -191,6 +240,7 @@ INSERT INTO sharing_governance (
   enforce_ib_segment_filtering
 ) VALUES (
   sqlc.arg(site_id),
+  sqlc.arg(audit_run_id),
   sqlc.arg(tenant_id),
   sqlc.arg(tenant_display_name),
   sqlc.arg(sharepoint_site_id),
@@ -204,7 +254,7 @@ INSERT INTO sharing_governance (
   sqlc.arg(site_ib_segment_ids),
   sqlc.arg(enforce_ib_segment_filtering)
 )
-ON CONFLICT(site_id) DO UPDATE SET
+ON CONFLICT(site_id, audit_run_id) DO UPDATE SET
   tenant_id                                  = excluded.tenant_id,
   tenant_display_name                        = excluded.tenant_display_name,
   sharepoint_site_id                         = excluded.sharepoint_site_id,
@@ -240,6 +290,7 @@ WHERE site_id = sqlc.arg(site_id);
 -- name: UpsertSharingAbilities :exec
 INSERT INTO sharing_abilities (
   site_id,
+  audit_run_id,
   can_stop_sharing,
   anonymous_link_abilities,
   anyone_link_abilities,
@@ -248,6 +299,7 @@ INSERT INTO sharing_abilities (
   direct_sharing_abilities
 ) VALUES (
   sqlc.arg(site_id),
+  sqlc.arg(audit_run_id),
   sqlc.arg(can_stop_sharing),
   sqlc.arg(anonymous_link_abilities),
   sqlc.arg(anyone_link_abilities),
@@ -255,7 +307,7 @@ INSERT INTO sharing_abilities (
   sqlc.arg(people_sharing_link_abilities),
   sqlc.arg(direct_sharing_abilities)
 )
-ON CONFLICT(site_id) DO UPDATE SET
+ON CONFLICT(site_id, audit_run_id) DO UPDATE SET
   can_stop_sharing                  = excluded.can_stop_sharing,
   anonymous_link_abilities          = excluded.anonymous_link_abilities,
   anyone_link_abilities             = excluded.anyone_link_abilities,
@@ -279,18 +331,20 @@ WHERE site_id = sqlc.arg(site_id);
 -- name: UpsertRecipientLimits :exec
 INSERT INTO recipient_limits (
   site_id,
+  audit_run_id,
   check_permissions,
   grant_direct_access,
   share_link,
   share_link_with_defer_redeem
 ) VALUES (
   sqlc.arg(site_id),
+  sqlc.arg(audit_run_id),
   sqlc.arg(check_permissions),
   sqlc.arg(grant_direct_access),
   sqlc.arg(share_link),
   sqlc.arg(share_link_with_defer_redeem)
 )
-ON CONFLICT(site_id) DO UPDATE SET
+ON CONFLICT(site_id, audit_run_id) DO UPDATE SET
   check_permissions               = excluded.check_permissions,
   grant_direct_access             = excluded.grant_direct_access,
   share_link                      = excluded.share_link,
@@ -311,6 +365,7 @@ WHERE site_id = sqlc.arg(site_id);
 INSERT INTO sensitivity_labels (
   site_id,
   item_guid,
+  audit_run_id,
   label_id,
   display_name,
   owner_email,
@@ -325,6 +380,7 @@ INSERT INTO sensitivity_labels (
 ) VALUES (
   sqlc.arg(site_id),
   sqlc.arg(item_guid),
+  sqlc.arg(audit_run_id),
   sqlc.arg(label_id),
   sqlc.arg(display_name),
   sqlc.arg(owner_email),
@@ -337,7 +393,7 @@ INSERT INTO sensitivity_labels (
   sqlc.arg(promotion_version),
   sqlc.arg(label_hash)
 )
-ON CONFLICT(site_id, item_guid) DO UPDATE SET
+ON CONFLICT(site_id, item_guid, audit_run_id) DO UPDATE SET
   label_id                = excluded.label_id,
   display_name            = excluded.display_name,
   owner_email             = excluded.owner_email,
@@ -392,6 +448,7 @@ ORDER BY discovered_at DESC;
 INSERT INTO sensitivity_labels (
   site_id,
   item_guid,
+  audit_run_id,
   sensitivity_label_id,
   display_name,
   color,
@@ -401,6 +458,7 @@ INSERT INTO sensitivity_labels (
 ) VALUES (
   sqlc.arg(site_id),
   sqlc.arg(item_guid),
+  sqlc.arg(audit_run_id),
   sqlc.arg(sensitivity_label_id),
   sqlc.arg(display_name),
   sqlc.arg(color),
@@ -408,7 +466,7 @@ INSERT INTO sensitivity_labels (
   sqlc.arg(has_irm_protection),
   sqlc.arg(sensitivity_label_protection_type)
 )
-ON CONFLICT(site_id, item_guid) DO UPDATE SET
+ON CONFLICT(site_id, item_guid, audit_run_id) DO UPDATE SET
   sensitivity_label_id                = excluded.sensitivity_label_id,
   display_name                        = excluded.display_name,
   color                               = excluded.color,

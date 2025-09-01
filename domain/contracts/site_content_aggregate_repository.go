@@ -21,9 +21,9 @@ type SiteContentAggregateRepository interface {
 	GetListByID(ctx context.Context, siteID int64, listID string) (*sharepoint.List, error)
 	GetListsForSite(ctx context.Context, siteID int64) ([]*sharepoint.List, error)
 
-	// List assignment operations
-	GetListAssignmentsWithRootCause(ctx context.Context, siteID int64, listID string) ([]*sharepoint.ResolvedAssignment, error)
-	GetAssignmentsForObject(ctx context.Context, siteID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error)
+	// List assignment operations (audit-scoped)
+	GetListAssignmentsWithRootCause(ctx context.Context, siteID int64, auditRunID int64, listID string) ([]*sharepoint.ResolvedAssignment, error)
+	GetAssignmentsForObject(ctx context.Context, siteID int64, auditRunID int64, objectType, objectKey string) ([]*sharepoint.Assignment, error)
 
 	// List item operations
 	GetListItems(ctx context.Context, siteID int64, listID string, offset, limit int) ([]*sharepoint.Item, error)

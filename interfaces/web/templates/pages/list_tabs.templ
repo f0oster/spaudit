@@ -11,16 +11,16 @@ templ ListOverviewTab(analytics presenters.ListAnalytics) {
 	@list.ListOverviewTab(analytics)
 }
 
-templ ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignmentCollection) {
-	@list.ListAssignmentsTab(siteID, collection)
+templ ListAssignmentsTab(siteID int64, auditRunID int64, collection presenters.ExpandableAssignmentCollection) {
+	@list.ListAssignmentsTab(siteID, auditRunID, collection)
 }
 
-templ ListItemsTab(listData presenters.ListSummary, items []presenters.ItemSummary) {
-	@list.ListItemsTab(listData, items)
+templ ListItemsTab(listData presenters.ListSummary, auditRunID int64, items []presenters.ItemSummary) {
+	@list.ListItemsTab(listData, auditRunID, items)
 }
 
-templ ListLinksTab(links []presenters.SharingLink) {
-	@list.ListLinksTab(links)
+templ ListLinksTab(links []presenters.SharingLink, auditRunID int64) {
+	@list.ListLinksTab(links, auditRunID)
 }
 
 templ SharingLinkMembersList(members []presenters.SharingLinkMember) {
@@ -28,9 +28,9 @@ templ SharingLinkMembersList(members []presenters.SharingLinkMember) {
 }
 
 
-templ TabsAndContent(siteID int64, listID string, activeTab string, content templ.Component) {
+templ TabsAndContent(siteID int64, auditRunID int64, listID string, activeTab string, content templ.Component) {
 	<div id="tab-headers" class="px-4 pt-3" hx-swap-oob="true">
-		@core.Tabs(siteID, listID, activeTab)
+		@core.Tabs(siteID, auditRunID, listID, activeTab)
 	</div>
 	<div id="tab-body" class="p-4" hx-swap-oob="true">
 		@content

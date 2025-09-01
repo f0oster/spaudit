@@ -17,7 +17,7 @@ import (
 )
 
 // ListAssignmentsTab renders the assignments tab content with expandable rows
-func ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignmentCollection) templ.Component {
+func ListAssignmentsTab(siteID int64, auditRunID int64, collection presenters.ExpandableAssignmentCollection) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -282,7 +282,7 @@ func ListAssignmentsTab(siteID int64, collection presenters.ExpandableAssignment
 							}
 							ctx = templ.InitializeContext(ctx)
 							if a.HasRootCauses {
-								templ_7745c5c3_Err = ui.ActionButton("Details", "/sites/"+fmt.Sprintf("%d", siteID)+"/assignments/"+a.UniqueID+"/toggle", "expand-row-"+a.UniqueID, "default").Render(ctx, templ_7745c5c3_Buffer)
+								templ_7745c5c3_Err = ui.ActionButton("Details", "/sites/"+fmt.Sprintf("%d", siteID)+"/audit-runs/"+fmt.Sprintf("%d", auditRunID)+"/assignments/"+a.UniqueID+"/toggle", "expand-row-"+a.UniqueID, "default").Render(ctx, templ_7745c5c3_Buffer)
 								if templ_7745c5c3_Err != nil {
 									return templ_7745c5c3_Err
 								}

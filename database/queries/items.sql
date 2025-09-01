@@ -9,10 +9,24 @@ WHERE site_id = sqlc.arg(site_id) AND list_id = sqlc.arg(list_id) AND has_unique
 ORDER BY item_id
 LIMIT sqlc.arg(limit) OFFSET sqlc.arg(offset);
 
+-- name: ItemsWithUniqueForListByAuditRun :many
+SELECT site_id, item_guid, list_item_guid, list_id, item_id, url, is_file, is_folder, has_unique, name, audit_run_id
+FROM items
+WHERE site_id = sqlc.arg(site_id) AND list_id = sqlc.arg(list_id) AND has_unique = 1 AND audit_run_id = sqlc.arg(audit_run_id)
+ORDER BY item_id
+LIMIT sqlc.arg(limit) OFFSET sqlc.arg(offset);
+
 -- name: ItemsForList :many
 SELECT site_id, item_guid, list_item_guid, list_id, item_id, url, is_file, is_folder, has_unique, name, audit_run_id
 FROM items
 WHERE site_id = sqlc.arg(site_id) AND list_id = sqlc.arg(list_id)
+ORDER BY item_id
+LIMIT sqlc.arg(limit) OFFSET sqlc.arg(offset);
+
+-- name: ItemsForListByAuditRun :many
+SELECT site_id, item_guid, list_item_guid, list_id, item_id, url, is_file, is_folder, has_unique, name, audit_run_id
+FROM items
+WHERE site_id = sqlc.arg(site_id) AND list_id = sqlc.arg(list_id) AND audit_run_id = sqlc.arg(audit_run_id)
 ORDER BY item_id
 LIMIT sqlc.arg(limit) OFFSET sqlc.arg(offset);
 

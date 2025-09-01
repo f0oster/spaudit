@@ -28,7 +28,7 @@ type GetWebRow struct {
 	Title      sql.NullString `json:"title"`
 	Template   sql.NullString `json:"template"`
 	HasUnique  sql.NullBool   `json:"has_unique"`
-	AuditRunID sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) GetWeb(ctx context.Context, arg GetWebParams) (GetWebRow, error) {
@@ -58,7 +58,7 @@ type InsertWebParams struct {
 	Title      sql.NullString `json:"title"`
 	Template   sql.NullString `json:"template"`
 	HasUnique  sql.NullBool   `json:"has_unique"`
-	AuditRunID sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) InsertWeb(ctx context.Context, arg InsertWebParams) error {
@@ -88,7 +88,7 @@ type ListWebsRow struct {
 	Title      sql.NullString `json:"title"`
 	Template   sql.NullString `json:"template"`
 	HasUnique  sql.NullBool   `json:"has_unique"`
-	AuditRunID sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID int64          `json:"audit_run_id"`
 	SiteUrl    string         `json:"site_url"`
 }
 
@@ -138,7 +138,7 @@ type ListWebsForSiteRow struct {
 	Title      sql.NullString `json:"title"`
 	Template   sql.NullString `json:"template"`
 	HasUnique  sql.NullBool   `json:"has_unique"`
-	AuditRunID sql.NullInt64  `json:"audit_run_id"`
+	AuditRunID int64          `json:"audit_run_id"`
 }
 
 func (q *Queries) ListWebsForSite(ctx context.Context, siteID int64) ([]ListWebsForSiteRow, error) {

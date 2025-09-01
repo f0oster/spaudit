@@ -41,6 +41,7 @@ type ListSummary struct {
 	HasUnique    bool
 	WebTitle     string
 	LastModified string
+	AuditRunID   int64
 }
 
 // ItemSummary represents SharePoint item information for permission analysis display.
@@ -300,15 +301,21 @@ func (p *PermissionPresenter) ToListAnalyticsViewModel(data *application.Permiss
 // Domain model to view model mapping functions.
 
 func (p *PermissionPresenter) MapListToViewModel(list *sharepoint.List) ListSummary {
+	var auditRunID int64
+	if list.AuditRunID != nil {
+		auditRunID = *list.AuditRunID
+	}
+	
 	return ListSummary{
-		SiteID:    list.SiteID,
-		ListID:    list.ID,
-		WebID:     list.WebID,
-		Title:     list.Title,
-		URL:       list.URL,
-		ItemCount: int64(list.ItemCount),
-		HasUnique: list.HasUnique,
-		WebTitle:  list.Title,
+		SiteID:     list.SiteID,
+		ListID:     list.ID,
+		WebID:      list.WebID,
+		Title:      list.Title,
+		URL:        list.URL,
+		ItemCount:  int64(list.ItemCount),
+		HasUnique:  list.HasUnique,
+		WebTitle:   list.Title,
+		AuditRunID: auditRunID,
 	}
 }
 

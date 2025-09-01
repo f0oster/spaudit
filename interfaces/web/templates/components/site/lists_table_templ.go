@@ -46,9 +46,9 @@ func SiteListsTable(vm presenters.SiteListsVM) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var2 string
-			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs("/sites/" + fmt.Sprintf("%d", vm.Site.SiteID) + "/lists/search")
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs("/sites/" + fmt.Sprintf("%d", vm.Site.SiteID) + "/audit-runs/" + fmt.Sprintf("%d", vm.AuditRunID) + "/lists/search")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `interfaces/web/templates/components/site/lists_table.templ`, Line: 23, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `interfaces/web/templates/components/site/lists_table.templ`, Line: 23, Col: 133}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -167,9 +167,9 @@ func SiteListsTable(vm presenters.SiteListsVM) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 templ.SafeURL
-				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs("/sites/" + fmt.Sprintf("%d", list.SiteID) + "/lists/" + list.ListID)
+				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs("/sites/" + fmt.Sprintf("%d", list.SiteID) + "/audit-runs/" + fmt.Sprintf("%d", vm.AuditRunID) + "/lists/" + list.ListID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `interfaces/web/templates/components/site/lists_table.templ`, Line: 76, Col: 87}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `interfaces/web/templates/components/site/lists_table.templ`, Line: 76, Col: 139}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {

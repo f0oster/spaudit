@@ -34,49 +34,20 @@ templ Badge(text string, variant string) {
 	}
 }
 
-// Legacy StatusBadge with emoji icons for backward compatibility
-templ StatusBadge(label string, badgeType string) {
-	switch badgeType {
-	case "unique":
-		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">
-			<span class="mr-1" role="img" aria-label="Warning">⚠️</span>{ label }
-		</span>
-	case "inherited":
-		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 whitespace-nowrap">
-			<span class="mr-1" role="img" aria-label="Success">✅</span>{ label }
-		</span>
-	case "active":
-		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 whitespace-nowrap">
-			<span class="mr-1" role="img" aria-label="Active">✅</span>{ label }
-		</span>
-	case "inactive":
-		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 whitespace-nowrap">
-			<span class="mr-1" role="img" aria-label="Inactive">❌</span>{ label }
-		</span>
-	case "direct":
-		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">
-			<span class="mr-1" role="img" aria-label="Direct">🎯</span>{ label }
-		</span>
-	default:
-		<span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-slate-100 text-slate-800 whitespace-nowrap">
-			{ label }
-		</span>
-	}
-}
 
 templ PermissionsBadge(hasUnique bool) {
 	if hasUnique {
-		@StatusBadge("Unique permissions", "unique")
+		@Badge("Unique permissions", "warning")
 	} else {
-		@StatusBadge("Inherited", "inherited")
+		@Badge("Inherited", "success")
 	}
 }
 
 templ LinkStatusBadge(isActive bool) {
 	if isActive {
-		@StatusBadge("Active", "active")
+		@Badge("Active", "success")
 	} else {
-		@StatusBadge("Inactive", "inactive")
+		@Badge("Inactive", "danger")
 	}
 }
 

@@ -23,13 +23,15 @@ WHERE site_id = sqlc.arg(site_id) AND object_type = sqlc.arg(object_type) AND ob
 INSERT INTO role_assignments (site_id, object_type, object_key, principal_id, role_def_id, inherited, audit_run_id)
 VALUES (sqlc.arg(site_id), sqlc.arg(object_type), sqlc.arg(object_key), sqlc.arg(principal_id), sqlc.arg(role_def_id), sqlc.arg(inherited), sqlc.arg(audit_run_id));
 
--- name: GetAssignmentsForObject :many
+
+-- name: GetAssignmentsForObjectByAuditRun :many
 SELECT ra.principal_id, p.title AS principal_title, p.login_name, p.principal_type,
        ra.role_def_id, rd.name AS role_name, rd.description, ra.inherited
 FROM role_assignments ra
-JOIN principals p ON p.site_id = ra.site_id AND p.principal_id = ra.principal_id
-JOIN role_definitions rd ON rd.site_id = ra.site_id AND rd.role_def_id = ra.role_def_id
+JOIN principals p ON p.site_id = ra.site_id AND p.principal_id = ra.principal_id AND p.audit_run_id = ra.audit_run_id
+JOIN role_definitions rd ON rd.site_id = ra.site_id AND rd.role_def_id = ra.role_def_id AND rd.audit_run_id = ra.audit_run_id
 WHERE ra.site_id = sqlc.arg(site_id) AND ra.object_type = sqlc.arg(object_type) AND ra.object_key = sqlc.arg(object_key)
+  AND ra.audit_run_id = sqlc.arg(audit_run_id)
 ORDER BY principal_title, role_name;
 
 -- name: GetWebIdForObject :one
@@ -45,7 +47,8 @@ LEFT JOIN items i ON sqlc.arg(object_type) = 'item' AND sqlc.arg(site_id) = i.si
 LEFT JOIN lists parent_list ON i.site_id = parent_list.site_id AND i.list_id = parent_list.list_id
 LIMIT 1;
 
--- name: GetRootPermissionsForPrincipalInWeb :many
+
+-- name: GetRootPermissionsForPrincipalInWebByAuditRun :many
 SELECT ra.object_type, ra.object_key, rd.name as role_name,
        CASE ra.object_type
          WHEN 'list' THEN l.title
@@ -53,12 +56,12 @@ SELECT ra.object_type, ra.object_key, rd.name as role_name,
          WHEN 'item' THEN i.name
        END as object_name
 FROM role_assignments ra
-JOIN role_definitions rd ON ra.site_id = rd.site_id AND ra.role_def_id = rd.role_def_id
-LEFT JOIN lists l ON ra.object_type = 'list' AND ra.site_id = l.site_id AND ra.object_key = l.list_id AND l.web_id = sqlc.arg(web_id)
-LEFT JOIN webs w ON ra.object_type = 'web' AND ra.site_id = w.site_id AND ra.object_key = w.web_id AND w.web_id = sqlc.arg(web_id)
-LEFT JOIN items i ON ra.object_type = 'item' AND ra.site_id = i.site_id AND ra.object_key = i.item_guid
-LEFT JOIN lists parent_list ON i.site_id = parent_list.site_id AND i.list_id = parent_list.list_id AND parent_list.web_id = sqlc.arg(web_id)
-WHERE ra.site_id = sqlc.arg(site_id) AND ra.principal_id = sqlc.arg(principal_id)
+JOIN role_definitions rd ON ra.site_id = rd.site_id AND ra.role_def_id = rd.role_def_id AND rd.audit_run_id = ra.audit_run_id
+LEFT JOIN lists l ON ra.object_type = 'list' AND ra.site_id = l.site_id AND ra.object_key = l.list_id AND l.web_id = sqlc.arg(web_id) AND l.audit_run_id = ra.audit_run_id
+LEFT JOIN webs w ON ra.object_type = 'web' AND ra.site_id = w.site_id AND ra.object_key = w.web_id AND w.web_id = sqlc.arg(web_id) AND w.audit_run_id = ra.audit_run_id
+LEFT JOIN items i ON ra.object_type = 'item' AND ra.site_id = i.site_id AND ra.object_key = i.item_guid AND i.audit_run_id = ra.audit_run_id
+LEFT JOIN lists parent_list ON i.site_id = parent_list.site_id AND i.list_id = parent_list.list_id AND parent_list.web_id = sqlc.arg(web_id) AND parent_list.audit_run_id = ra.audit_run_id
+WHERE ra.site_id = sqlc.arg(site_id) AND ra.principal_id = sqlc.arg(principal_id) AND ra.audit_run_id = sqlc.arg(audit_run_id)
   AND rd.name NOT LIKE '%Limited%'
   AND (
     (ra.object_type = 'web' AND w.site_id = sqlc.arg(site_id) AND w.web_id = sqlc.arg(web_id))

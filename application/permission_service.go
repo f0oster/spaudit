@@ -44,14 +44,32 @@ type PermissionAnalysisData struct {
 // PermissionService handles permission analysis and risk assessment business logic using aggregate repository.
 type PermissionService struct {
 	permissionAggregate contracts.PermissionAggregateRepository
+	auditRunID          int64 // For audit-scoped operations
 }
 
 // NewPermissionService creates a new permission service with aggregate repository dependency injection.
 func NewPermissionService(
 	permissionAggregate contracts.PermissionAggregateRepository,
 ) *PermissionService {
+	return newPermissionService(permissionAggregate, 0) // 0 means no specific audit run
+}
+
+// NewAuditScopedPermissionService creates a permission service scoped to a specific audit run.
+func NewAuditScopedPermissionService(
+	permissionAggregate contracts.PermissionAggregateRepository,
+	auditRunID int64,
+) *PermissionService {
+	return newPermissionService(permissionAggregate, auditRunID)
+}
+
+// newPermissionService is the common constructor.
+func newPermissionService(
+	permissionAggregate contracts.PermissionAggregateRepository,
+	auditRunID int64,
+) *PermissionService {
 	return &PermissionService{
 		permissionAggregate: permissionAggregate,
+		auditRunID:          auditRunID,
 	}
 }
 
@@ -61,8 +79,8 @@ func (s *PermissionService) AnalyzeListPermissions(
 	siteID int64,
 	list *sharepoint.List,
 ) (*PermissionAnalysisData, error) {
-	// Get raw components from aggregate repository
-	components, err := s.permissionAggregate.GetPermissionAnalysisComponents(ctx, siteID, list)
+	// Get raw components from aggregate repository (audit-scoped)
+	components, err := s.permissionAggregate.GetPermissionAnalysisComponents(ctx, siteID, s.auditRunID, list)
 	if err != nil {
 		return nil, err
 	}

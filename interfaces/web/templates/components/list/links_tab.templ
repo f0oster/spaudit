@@ -7,7 +7,7 @@ import (
 )
 
 // ListLinksTab renders the sharing links tab content with expandable member details
-templ ListLinksTab(links []presenters.SharingLink) {
+templ ListLinksTab(links []presenters.SharingLink, auditRunID int64) {
 	if len(links) == 0 {
 		@ui.EmptyState("No Sharing Links Found", "This list doesn't contain any items with sharing links, or sharing analysis wasn't performed.", "🔗")
 	} else {
@@ -73,7 +73,7 @@ templ ListLinksTab(links []presenters.SharingLink) {
 							}
 						}
 						@ui.TableCell() {
-							@ui.ActionButton(fmt.Sprintf("%d members", link.ActualMembersCount), "/sites/" + fmt.Sprintf("%d", link.SiteID) + "/sharing-links/" + fmt.Sprintf("%s", link.LinkID) + "/members/toggle", "members-row-" + fmt.Sprintf("%s", link.LinkID), "default")
+							@ui.ActionButton(fmt.Sprintf("%d members", link.ActualMembersCount), "/sites/" + fmt.Sprintf("%d", link.SiteID) + "/audit-runs/" + fmt.Sprintf("%d", auditRunID) + "/sharing-links/" + fmt.Sprintf("%s", link.LinkID) + "/members/toggle", "members-row-" + fmt.Sprintf("%s", link.LinkID), "default")
 						}
 						@ui.TableCell() {
 							if link.CreatedAt != "" {

@@ -21,8 +21,7 @@ type SSEClient struct {
 	lastSent time.Time
 }
 
-// SSEManager manages Server-Sent Events connections and real-time broadcasting.
-// Handles job status updates and live UI refreshes.
+// SSEManager manages Server-Sent Events connections for real-time updates.
 type SSEManager struct {
 	clients        map[string]*SSEClient
 	mu             sync.RWMutex
@@ -32,7 +31,7 @@ type SSEManager struct {
 	cancel         context.CancelFunc
 }
 
-// NewSSEManager creates a new SSE connection manager with cleanup routines.
+// NewSSEManager creates a new SSE connection manager.
 func NewSSEManager(appCtx context.Context) *SSEManager {
 	ctx, cancel := context.WithCancel(appCtx)
 	
@@ -50,7 +49,7 @@ func NewSSEManager(appCtx context.Context) *SSEManager {
 	return manager
 }
 
-// AddClient adds a new SSE client connection
+// AddClient adds a new SSE client connection.
 func (s *SSEManager) AddClient(clientID string, w http.ResponseWriter) *SSEClient {
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -89,7 +88,7 @@ func (s *SSEManager) AddClient(clientID string, w http.ResponseWriter) *SSEClien
 	return client
 }
 
-// RemoveClient removes an SSE client connection
+// RemoveClient removes an SSE client connection.
 func (s *SSEManager) RemoveClient(clientID string) {
 	s.mu.Lock()
 	client, exists := s.clients[clientID]
@@ -110,13 +109,13 @@ func (s *SSEManager) RemoveClient(clientID string) {
 	}
 }
 
-// CloseAll closes all SSE connections and shuts down the manager
+// CloseAll closes all SSE connections.
 func (s *SSEManager) CloseAll() {
 	s.logger.Info("Closing all SSE connections")
 	s.cancel()
 }
 
-// closeAllConnections removes all active connections (called during shutdown)
+// closeAllConnections removes all active connections.
 func (s *SSEManager) closeAllConnections() {
 	s.mu.Lock()
 	clientIDs := make([]string, 0, len(s.clients))
@@ -132,7 +131,7 @@ func (s *SSEManager) closeAllConnections() {
 	}
 }
 
-// BroadcastJobUpdate broadcasts a job status update to all connected clients
+// BroadcastJobUpdate broadcasts a job update to all clients.
 func (s *SSEManager) BroadcastJobUpdate(jobID string, data string) {
 	// Copy clients list to avoid holding lock during I/O
 	s.mu.RLock()

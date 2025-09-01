@@ -11,8 +11,7 @@ import (
 	"spaudit/logging"
 )
 
-// AuditHandlers handles audit-related HTTP endpoints.
-// Provides thin HTTP orchestration between request handling and business logic.
+// AuditHandlers handles HTTP requests for audit operations.
 type AuditHandlers struct {
 	auditService   application.AuditService
 	auditPresenter *presenters.AuditPresenter
@@ -20,7 +19,7 @@ type AuditHandlers struct {
 	logger         *logging.Logger
 }
 
-// NewAuditHandlers creates a new audit handlers instance with required dependencies.
+// NewAuditHandlers creates a new audit handlers instance.
 func NewAuditHandlers(
 	auditService application.AuditService,
 	auditPresenter *presenters.AuditPresenter,
@@ -34,7 +33,8 @@ func NewAuditHandlers(
 	}
 }
 
-// GetAuditStatus handles GET /audit/status?site_url=... - retrieves current audit status for a site.
+// GetAuditStatus retrieves audit status for a site.
+// GET /audit/status?site_url={siteURL}
 func (h *AuditHandlers) GetAuditStatus(w http.ResponseWriter, r *http.Request) {
 	siteURL := r.URL.Query().Get("site_url")
 	if siteURL == "" {
@@ -60,7 +60,8 @@ func (h *AuditHandlers) GetAuditStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ListActiveAudits handles GET /audit/active - returns all currently running audits.
+// ListActiveAudits returns all currently running audits.
+// GET /audit/active
 func (h *AuditHandlers) ListActiveAudits(w http.ResponseWriter, r *http.Request) {
 	// Use application service to get active audits
 	audits := h.auditService.GetActiveAudits()
@@ -75,7 +76,8 @@ func (h *AuditHandlers) ListActiveAudits(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// RunAudit handles POST /audit - queues a new audit request with form data configuration.
+// RunAudit queues a new audit request.
+// POST /audit
 func (h *AuditHandlers) RunAudit(w http.ResponseWriter, r *http.Request) {
 	siteURL := r.FormValue("site_url")
 

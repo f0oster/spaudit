@@ -8,16 +8,16 @@ import (
 	"spaudit/domain/sharepoint"
 )
 
-// Permission-related view data structures
+// View models for permission-related UI components.
 
-// Site represents basic site information for UI display.
+// Site represents basic site information.
 type Site struct {
 	SiteID  int64
 	SiteURL string
 	Title   string
 }
 
-// SiteWithMetadata represents site data enriched with computed metadata for dashboard display.
+// SiteWithMetadata represents site data with computed audit statistics.
 type SiteWithMetadata struct {
 	SiteID          int64
 	SiteURL         string
@@ -25,11 +25,11 @@ type SiteWithMetadata struct {
 	Description     string
 	TotalLists      int
 	ListsWithUnique int
-	LastAuditDate   string
+	LastAuditDate   string // Formatted relative date
 	DaysAgo         int
 }
 
-// ListSummary represents list information optimized for table display and navigation.
+// ListSummary represents list data for table display.
 type ListSummary struct {
 	SiteID       int64
 	SiteURL      string
@@ -44,7 +44,7 @@ type ListSummary struct {
 	AuditRunID   int64
 }
 
-// ItemSummary represents SharePoint item information for permission analysis display.
+// ItemSummary represents item data for permission analysis.
 type ItemSummary struct {
 	SiteID    int64
 	ItemGUID  string
@@ -57,7 +57,7 @@ type ItemSummary struct {
 	Name      string
 }
 
-// Assignment represents a permission assignment for UI display.
+// Assignment represents a permission assignment.
 type Assignment struct {
 	PrincipalTitle string
 	LoginName      string
@@ -66,18 +66,19 @@ type Assignment struct {
 	Inherited      bool
 }
 
-// ExpandableAssignment extends Assignment with root cause analysis for detailed permission investigation.
-// RootCauseVM represents a single permission source for the UI
+// RootCauseVM represents a permission source for root cause analysis.
 type RootCauseVM struct {
-	Type         string // "SHARING_LINK", "SAME_WEB_INHERITANCE", "SYSTEM_GROUP", "UNKNOWN"
+	Type         string // "SHARING_LINK", "INHERITANCE", etc.
 	Detail       string
 	SourceObject string
 	SourceRole   string
 }
 
+// ExpandableAssignment extends basic Assignment with detailed root cause analysis.
+// Used for permission investigation and troubleshooting interfaces.
 type ExpandableAssignment struct {
 	Assignment
-	// Root cause analysis (loaded on-demand)
+	// Root cause analysis data (loaded on-demand via HTMX)
 	RootCauses    []RootCauseVM // All detected permission sources
 	HasRootCauses bool          // Whether any root causes were found
 	// Unique identifier for HTMX interactions

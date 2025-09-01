@@ -1,4 +1,4 @@
-// Package presenters transforms domain data into UI-ready view models.
+// Package presenters transforms domain data into view models for templates.
 package presenters
 
 import (
@@ -10,14 +10,14 @@ import (
 	"spaudit/domain/sharepoint"
 )
 
-// AuditRunOption represents an audit run option for UI selection
+// AuditRunOption represents an audit run option for dropdowns.
 type AuditRunOption struct {
 	ID        int64     `json:"id"`
 	StartedAt time.Time `json:"started_at"`
 	Status    string    `json:"status"`
 }
 
-// SiteListsVM is the view model for the site lists page
+// SiteListsVM is the view model for the site lists page.
 type SiteListsVM struct {
 	Site            SiteWithMetadata
 	Lists           []ListSummary
@@ -28,21 +28,15 @@ type SiteListsVM struct {
 	AuditRuns       []AuditRunOption
 }
 
-// ListPresenter transforms site and list data for UI display.
-// TODO: Add pagination support to presenter layer:
-// - Create PaginatedItemsResponse struct with Items []ItemSummary + PaginationMeta
-// - Add MapItemsWithPagination method for transforming paginated business data
-// - Include pagination controls data (current page, total pages, has next/prev)
-// - Add client-side state management for infinite scroll or traditional pagination
-// - Consider performance optimizations for large lists (virtual scrolling, lazy loading)
+// ListPresenter transforms site and list data for templates.
 type ListPresenter struct{}
 
-// NewListPresenter creates a list presenter.
+// NewListPresenter creates a new list presenter.
 func NewListPresenter() *ListPresenter {
 	return &ListPresenter{}
 }
 
-// ToSiteListsViewModel converts site data to UI view model with formatted dates and statistics.
+// ToSiteListsViewModel converts service data to view model.
 // Returns safe defaults if data is nil.
 func (p *ListPresenter) ToSiteListsViewModel(data *application.SiteWithListsData) *SiteListsVM {
 	if data == nil {
@@ -68,7 +62,7 @@ func (p *ListPresenter) ToSiteListsViewModel(data *application.SiteWithListsData
 	}
 }
 
-// toSiteWithMetadata converts service data to site metadata with formatted audit dates.
+// toSiteWithMetadata converts service data to site metadata.
 func (p *ListPresenter) toSiteWithMetadata(data *application.SiteWithListsData) SiteWithMetadata {
 	if data == nil {
 		return SiteWithMetadata{}
@@ -97,7 +91,7 @@ func (p *ListPresenter) toSiteWithMetadata(data *application.SiteWithListsData) 
 	}
 }
 
-// toListSummaries converts domain lists to view models with formatted timestamps.
+// toListSummaries converts domain lists to view model summaries.
 func (p *ListPresenter) toListSummaries(domainLists []*sharepoint.List) []ListSummary {
 	summaries := make([]ListSummary, len(domainLists))
 
@@ -125,7 +119,7 @@ func (p *ListPresenter) toListSummaries(domainLists []*sharepoint.List) []ListSu
 	return summaries
 }
 
-// ToListSummaries converts domain lists to view models with formatted timestamps.
+// ToListSummaries converts domain lists to view models.
 func (p *ListPresenter) ToListSummaries(domainLists []*sharepoint.List) []ListSummary {
 	return p.toListSummaries(domainLists)
 }

@@ -1,3 +1,4 @@
+// Package handlers provides HTTP request handlers for the web interface.
 package handlers
 
 import (
@@ -16,8 +17,7 @@ import (
 	"spaudit/interfaces/web/templates/pages"
 )
 
-// ListHandlers handles list-related HTTP endpoints.
-// Orchestrates between business services and presentation logic for list operations.
+// ListHandlers handles HTTP requests for SharePoint list operations.
 type ListHandlers struct {
 	// Application services (web UI orchestration)
 	siteContentService  *application.SiteContentService
@@ -35,7 +35,7 @@ type ListHandlers struct {
 	serviceFactory      application.AuditRunScopedServiceFactory
 }
 
-// NewListHandlers creates a new list handlers instance with required dependencies.
+// NewListHandlers creates a new list handlers instance.
 func NewListHandlers(
 	siteContentService *application.SiteContentService,
 	permissionService *application.PermissionService,
@@ -60,7 +60,8 @@ func NewListHandlers(
 	}
 }
 
-// Home renders the main site selection page with audit components and job list.
+// Home renders the main dashboard/site selection page.
+// GET /
 func (h *ListHandlers) Home(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -81,7 +82,8 @@ func (h *ListHandlers) Home(w http.ResponseWriter, r *http.Request) {
 	RenderResponse(ctx, w, r, pages.SiteSelectionPage(*siteSelectionVM))
 }
 
-// SiteListsPage renders the lists page for a specific site with metadata.
+// SiteListsPage renders the lists page for a site and audit run.
+// GET /sites/{siteID}/audit-runs/{auditRunID}/lists
 func (h *ListHandlers) SiteListsPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -140,7 +142,8 @@ func (h *ListHandlers) SiteListsPage(w http.ResponseWriter, r *http.Request) {
 	RenderResponse(ctx, w, r, pages.SiteListsPage(*viewModel))
 }
 
-// ListDetail renders the list detail page with default overview tab loaded.
+// ListDetail renders the detailed view for a specific list.
+// GET /sites/{siteID}/audit-runs/{auditRunID}/lists/{listID}
 func (h *ListHandlers) ListDetail(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

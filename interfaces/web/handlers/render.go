@@ -1,3 +1,4 @@
+// Package handlers render provides HTTP response and HTMX utilities.
 package handlers
 
 import (
@@ -8,7 +9,7 @@ import (
 	"github.com/a-h/templ"
 )
 
-// RenderResponse handles rendering Templ components with proper HTTP headers.
+// RenderResponse renders Templ components to HTTP responses.
 func RenderResponse(ctx context.Context, w http.ResponseWriter, r *http.Request, component templ.Component) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := component.Render(ctx, w); err != nil {
@@ -16,17 +17,17 @@ func RenderResponse(ctx context.Context, w http.ResponseWriter, r *http.Request,
 	}
 }
 
-// IsHTMXRequest checks if the request originates from HTMX.
+// IsHTMXRequest checks if the request came from HTMX.
 func IsHTMXRequest(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
 }
 
-// IsHTMXPartialRequest checks if this is a targeted HTMX partial content request.
+// IsHTMXPartialRequest checks if this is a targeted HTMX partial update.
 func IsHTMXPartialRequest(r *http.Request) bool {
 	return IsHTMXRequest(r) && r.Header.Get("HX-Target") != ""
 }
 
-// GetHTMXTarget returns the HTMX target element ID with # prefix removed.
+// GetHTMXTarget returns the HTMX target element ID.
 func GetHTMXTarget(r *http.Request) string {
 	target := r.Header.Get("HX-Target")
 	// Remove # prefix if present

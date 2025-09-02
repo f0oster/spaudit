@@ -133,28 +133,40 @@ LOG_LEVEL=info                       # debug, info, warn, error
 The application follows clean architecture patterns with clear separation of concerns:
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Web UI        │    │  Background      │    │  SharePoint     │
-│ (HTMX/Tailwind) │◄──►│  Job System      │◄──►│  API Client     │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Application    │    │   Domain         │    │  Infrastructure │
-│  Services       │◄──►│   Models         │◄──►│  Repositories   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                     ┌──────────────────┐
-                     │  SQLite Database │
-                     └──────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                   External Users                            │
+│                  (HTTP Requests)                            │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────┐ ┌─────────────────────────────────────┐
+│            Interface Layer          │ │            Platform Layer           │
+│         (Web Handlers)              │ │         (Job Executors)             │
+└─────────────────┬───────────────────┘ └─────────────────┬───────────────────┘
+                  │                                       │
+                  └───────────────┬───────────────────────┘
+                                  ▼
+                  ┌─────────────────────────────────────────────────────────────┐
+                  │               Application Layer                             │
+                  │                    Services                                 │
+                  └─────────────────────────┬───────────────────────────────────┘
+                                            │
+                  ┌─────────────────────────▼───────────────────────────────────┐
+                  │               Infrastructure Layer                          │
+                  │      Repositories, SharePoint Client, Database             │
+                  └─────────────────────────┬───────────────────────────────────┘
+                                            │
+                  ┌─────────────────────────▼───────────────────────────────────┐
+                  │                 Domain Layer                                │
+                  │            Entities, Contracts, Events                     │
+                  └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Components
-- **Domain Layer**: Core business entities (sites, lists, items, jobs)
-- **Application Layer**: Business logic services
-- **Infrastructure Layer**: Database access, SharePoint client, audit engines
-- **Interface Layer**: Web handlers, templates, API endpoints
+- **Domain Layer**: Core entities (sites, lists, items, jobs)
+- **Application Layer**: Services that coordinate repositories and infrastructure
+- **Infrastructure Layer**: Database access, SharePoint client, repositories
+- **Interface Layer**: Web handlers, templates, presenters
 - **Platform Layer**: Background job processing and workflows
 
 ## How It Works

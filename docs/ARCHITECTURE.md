@@ -17,48 +17,48 @@ The project uses layered architecture with dependency inversion:
 
 ### Core Principles
 - **Dependency Direction**: All dependencies point inward toward the domain
-- **Business Logic Isolation**: Domain code has no external dependencies
+- **Domain Isolation**: Domain code imports no external packages
 - **Interface Segregation**: Repository interfaces define clear contracts
 - **Composition over Inheritance**: Services compose repositories rather than inherit
 
 ### Layer Responsibilities
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     External Systems                        │
-│              (SharePoint API, SQLite, HTTP)                 │
+│                   External Users                            │
+│                  (HTTP Requests)                            │
 └─────────────────────────┬───────────────────────────────────┘
                           │
-┌─────────────────────────▼───────────────────────────────────┐
-│                Interface Layer                              │
-│      HTTP Handlers, Templates, Presenters                   │
-│         (interfaces/web/)                                   │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│                Platform Layer                               │
-│      Workflows, Job Executors, Factories                    │
-│            (platform/)                                      │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│               Application Layer                             │
-│         Business Logic Services                             │
-│            (application/)                                   │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│               Infrastructure Layer                          │
-│    Repositories, SharePoint Client, Database                │
-│          (infrastructure/)                                  │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│                 Domain Layer                                │
-│    Entities, Value Objects, Domain Services                 │
-│    Repository Contracts, Domain Events                      │
-│              (domain/)                                      │
-└─────────────────────────────────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────┐ ┌─────────────────────────────────────┐
+│            Interface Layer          │ │            Platform Layer           │
+│    HTTP Handlers, Templates,        │ │      Workflows, Job Executors,      │
+│         Presenters                  │ │            Factories                │
+│        (interfaces/web/)            │ │           (platform/)               │
+└─────────────────┬───────────────────┘ └─────────────────┬───────────────────┘
+                  │                                       │
+                  └───────────────┬───────────────────────┘
+                                  ▼
+                  ┌─────────────────────────────────────────────────────────────┐
+                  │               Application Layer                             │
+                  │                    Services                                 │
+                  │            (application/)                                   │
+                  └─────────────────────────┬───────────────────────────────────┘
+                                            │
+                  ┌─────────────────────────▼───────────────────────────────────┐
+                  │               Infrastructure Layer                          │
+                  │    Repositories, SharePoint Client, Database                │
+                  │          (infrastructure/)                                  │
+                  └─────────────────────────┬───────────────────────────────────┘
+                                            │
+                  ┌─────────────────────────▼───────────────────────────────────┐
+                  │                 Domain Layer                                │
+                  │    Entities, Value Objects, Domain Services                 │
+                  │    Repository Contracts, Domain Events                      │
+                  │              (domain/)                                      │
+                  └─────────────────────────────────────────────────────────────┘
 ```
+
+**Dependency Direction**: Both Interface and Platform layers depend directly on the Application layer. Infrastructure layer depends on Domain contracts. All dependencies point toward the Domain layer.
 
 ## Layer Details
 
@@ -108,7 +108,7 @@ type SiteRepository interface {
 
 ### Application Layer (`application/`)
 
-Services that compose repositories for use cases.
+Services that compose repositories, domain logic, and infrastructure components.
 
 ```go
 // application/site_content_service.go
@@ -124,8 +124,8 @@ func (s *SiteContentService) GetSiteWithLists(ctx context.Context, siteID int64)
     // 2. Get lists for the site (automatically audit-run filtered)
     lists, err := s.contentAggregate.GetListsForSite(ctx, siteID)
     
-    // 3. Apply business calculations
-    return s.calculateBusinessMetrics(siteWithMeta, lists), nil
+    // 3. Calculate aggregated metrics
+    return s.calculateMetrics(siteWithMeta, lists), nil
 }
 ```
 
